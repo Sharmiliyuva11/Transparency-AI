@@ -1,2 +1,2 @@
 # Transparency-AI
-An AI based Expense Transparency System fro NGO'S and small Businesses
+An AI based Expense Transparency System for NGO'S and small Businesses
