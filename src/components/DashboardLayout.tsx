@@ -6,6 +6,7 @@ type SidebarLink = {
   label: string;
   icon: ReactNode;
   path?: string;
+  onClick?: () => void;
 };
 
 type DashboardLayoutProps = {
@@ -54,6 +55,19 @@ export default function DashboardLayout({
                     {link.icon}
                     {link.label}
                   </Link>
+                );
+              }
+              if (link.onClick) {
+                return (
+                  <div
+                    key={link.label}
+                    className="sidebar-link"
+                    onClick={link.onClick}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {link.icon}
+                    {link.label}
+                  </div>
                 );
               }
               return (
