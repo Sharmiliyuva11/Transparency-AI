@@ -27,7 +27,7 @@ export default function AdminDashboardWrapper() {
         { label: "Anomaly Detection", icon: <FiActivity />, path: "/dashboard/admin/anomaly-detection" },
         { label: "Reports", icon: <FiBarChart2 />, path: "/dashboard/admin/reports" },
         { label: "User Management", icon: <FiUserCheck />, path: "/dashboard/admin/user-management" },
-        { label: "AI Insights", icon: <FiBookOpen /> }
+        { label: "AI Insights", icon: <FiBookOpen />, path: "/dashboard/admin/ai-insights" }
       ]}
       footerLinks={[]}
       title="Smart Auditor AI"

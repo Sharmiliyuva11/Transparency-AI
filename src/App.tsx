@@ -16,6 +16,7 @@ import ExpenseCategories from "./pages/admin/ExpenseCategories";
 import AnomalyDetection from "./pages/admin/AnomalyDetection";
 import UserManagement from "./pages/admin/UserManagement";
 import Reports from "./pages/admin/Reports";
+import AIInsights from "./pages/admin/AIInsights";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="anomaly-detection" element={<AnomalyDetection />} />
         <Route path="user-management" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="ai-insights" element={<AIInsights />} />
       </Route>
       <Route path="/dashboard/auditor" element={<AuditorDashboard />} />
       <Route path="/dashboard/employee" element={<EmployeeDashboard />}>
