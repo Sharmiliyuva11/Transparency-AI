@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiFileText, FiShield, FiZap } from "react-icons/fi";
+import { FiFileText, FiMoon, FiShield, FiSun, FiZap } from "react-icons/fi";
 import { HiOutlineDocumentSearch } from "react-icons/hi";
+import { useTheme } from "../context/ThemeContext";
 
 const roles = [
   { key: "admin", label: "Admin", path: "/dashboard/admin" },
@@ -30,6 +31,7 @@ const features = [
 export default function LoginPage() {
   const [activeRole, setActiveRole] = useState(roles[0]);
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -61,7 +63,14 @@ export default function LoginPage() {
             <h2>Welcome Back</h2>
             <p className="dashboard-subtitle">Sign in to access your dashboard</p>
           </div>
-          <FiFileText size={26} color="#3ba8ff" />
+          <div className="login-actions">
+            <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
+              {theme === "dark" ? <FiSun /> : <FiMoon />}
+            </button>
+            <div className="icon-button" aria-hidden="true">
+              <FiFileText />
+            </div>
+          </div>
         </div>
         <div className="auth-tabs">
           {roles.map((role) => (

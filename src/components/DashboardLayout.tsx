@@ -1,6 +1,7 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FiBell, FiMoon, FiSettings, FiSun } from "react-icons/fi";
+import { useTheme } from "../context/ThemeContext";
 
 type SidebarLink = {
   label: string;
@@ -31,22 +32,7 @@ export default function DashboardLayout({
   userRole
 }: DashboardLayoutProps) {
   const location = useLocation();
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark";
-    const stored = window.localStorage.getItem("transparency-theme");
-    return stored === "light" ? "light" : "dark";
-  });
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("transparency-theme", theme);
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="dashboard-layout">
@@ -60,7 +46,9 @@ export default function DashboardLayout({
           </div>
           <nav className="sidebar-nav">
             {sidebarLinks.map((link) => {
-              const isActive = link.path ? location.pathname === link.path : false;
+              const isActive = link.path
+                ? location.pathname === link.path || location.pathname.startsWith(`${link.path}/`)
+                : false;
               if (link.path) {
                 return (
                   <Link

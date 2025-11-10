@@ -1,77 +1,35 @@
-import DashboardLayout from "../components/DashboardLayout";
-import {
-  FiActivity,
-  FiBarChart2,
-  FiBookOpen,
-  FiFolder,
-  FiGrid,
-  FiList,
-  FiPieChart,
-  FiSettings,
-  FiUploadCloud,
-  FiUserCheck
-} from "react-icons/fi";
-import { FaRobot } from "react-icons/fa6";
-import {
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis
-} from "recharts";
+import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 const spendingByCategory = [
-  { name: "Travel", value: 62, color: "#3ba8ff" },
-  { name: "Food", value: 14, color: "#38d788" },
-  { name: "Office", value: 24, color: "#ffa94d" }
+  { name: "Travel", value: 45, color: "#3ba8ff" },
+  { name: "Food", value: 30, color: "#38d788" },
+  { name: "Office", value: 25, color: "#ffa94d" }
 ];
 
 const monthlyTrend = [
-  { month: "Jul", value: 520 },
-  { month: "Aug", value: 640 },
-  { month: "Sep", value: 580 },
-  { month: "Oct", value: 720 }
+  { month: "Jul", value: 420 },
+  { month: "Aug", value: 380 },
+  { month: "Sep", value: 450 },
+  { month: "Oct", value: 520 }
 ];
 
 const recentExpenses = [
   { date: "2025-11-01", vendor: "Coffee Shop", amount: "$45", category: "Food", status: "Approved" },
   { date: "2025-10-30", vendor: "Uber", amount: "$28", category: "Travel", status: "Approved" },
   { date: "2025-10-28", vendor: "Office Depot", amount: "$120", category: "Office", status: "Pending" },
-  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$450", category: "Travel", status: "Flagged" },
+  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$250", category: "Travel", status: "Approved" },
   { date: "2025-10-22", vendor: "Restaurant", amount: "$85", category: "Food", status: "Approved" }
 ];
 
-const statBadges: Record<string, string> = {
+const statusBadges: Record<string, string> = {
   Approved: "badge green",
   Pending: "badge yellow",
   Flagged: "badge red"
 };
 
-export default function AdminDashboard() {
+export default function Overview() {
   return (
-    <DashboardLayout
-      appName="AI Expense Transparency"
-      sidebarLinks={[
-        { label: "Dashboard Overview", icon: <FiGrid />, path: "/dashboard/admin" },
-        { label: "Upload Receipt", icon: <FiUploadCloud /> },
-        { label: "My Expenses", icon: <FiFolder /> },
-        { label: "AI Assistant", icon: <FaRobot /> },
-        { label: "Settings", icon: <FiSettings /> },
-        { label: "Expense Categories", icon: <FiPieChart /> },
-        { label: "Anomaly Detection", icon: <FiActivity /> },
-        { label: "Reports", icon: <FiBarChart2 /> },
-        { label: "User Management", icon: <FiUserCheck /> },
-        { label: "AI Insights", icon: <FiBookOpen /> }
-      ]}
-      footerLinks={[{ label: "Support", icon: <FiList /> }]}
-      title="My Expense Dashboard"
-      subtitle="Track and manage your personal expenses"
-      userName="Admin User"
-      userRole="Admin"
-    >
+    <>
       <div className="grid cols-4">
         <div className="stat-card">
           <div className="stat-label">My Total Expenses</div>
@@ -80,18 +38,18 @@ export default function AdminDashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-label">Receipts Uploaded</div>
-          <div className="stat-value">5</div>
+          <div className="stat-value">12</div>
           <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card accent-yellow">
           <div className="stat-label">Pending Review</div>
-          <div className="stat-value">1</div>
+          <div className="stat-value">4</div>
           <div className="stat-label">Awaiting approval</div>
         </div>
-        <div className="stat-card accent-red">
-          <div className="stat-label">Flagged Items</div>
-          <div className="stat-value">1</div>
-          <div className="stat-label">Needs attention</div>
+        <div className="stat-card accent-green">
+          <div className="stat-label">Policy Compliance</div>
+          <div className="stat-value">96%</div>
+          <div className="stat-label">+4% vs last month</div>
         </div>
       </div>
       <div className="grid cols-2">
@@ -131,9 +89,9 @@ export default function AdminDashboard() {
                 <XAxis dataKey="month" stroke="#5870a5" dy={6} tickLine={false} axisLine={false} />
                 <Tooltip
                   cursor={{ stroke: "#3ba8ff", strokeWidth: 1 }}
-                  contentStyle={{ background: "#0c1736", borderRadius: 12, border: "1px solid rgba(71,102,190,0.45)" }}
-                  labelStyle={{ color: "#99a5cc" }}
-                  itemStyle={{ color: "#e6ecff" }}
+                  contentStyle={{ background: "var(--surface-card)", borderRadius: 12, border: "1px solid var(--border-strong)" }}
+                  labelStyle={{ color: "var(--text-secondary)" }}
+                  itemStyle={{ color: "var(--text-primary)" }}
                 />
                 <Line type="monotone" dataKey="value" stroke="#3ba8ff" strokeWidth={3} dot={{ r: 4 }} />
               </LineChart>
@@ -169,7 +127,7 @@ export default function AdminDashboard() {
                   <span className="badge blue">{expense.category}</span>
                 </td>
                 <td>
-                  <span className={statBadges[expense.status]}>{expense.status}</span>
+                  <span className={statusBadges[expense.status] ?? "badge yellow"}>{expense.status}</span>
                 </td>
                 <td>
                   <a className="secondary-link" href="#">
@@ -193,6 +151,6 @@ export default function AdminDashboard() {
           Your travel expenses are 15% higher than your department average. Consider using company preferred vendors for better rates.
         </p>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

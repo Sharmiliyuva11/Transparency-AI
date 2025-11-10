@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type Theme = "dark" | "light";
 
@@ -8,39 +8,40 @@ type ThemeContextValue = {
   setTheme: (value: Theme) => void;
 };
 
+const STORAGE_KEY = "transparency-ai-theme";
+
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-const THEME_KEY = "transparency-ai-theme";
-
-function getInitialTheme(): Theme {
+function getPreferredTheme(): Theme {
   if (typeof window === "undefined") {
     return "dark";
   }
-  const stored = window.localStorage.getItem(THEME_KEY) as Theme | null;
-  if (stored === "dark" || stored === "light") {
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  if (stored === "light" || stored === "dark") {
     return stored;
   }
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return prefersDark ? "dark" : "light";
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+    return "light";
+  }
+  return "dark";
 }
 
-type ThemeProviderProps = {
-  children: ReactNode;
-};
-
-export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(() => getPreferredTheme());
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.body.setAttribute("data-theme", theme);
-    window.localStorage.setItem(THEME_KEY, theme);
+    const body = document.body;
+    body.classList.remove("theme-dark", "theme-light");
+    const nextClass = theme === "light" ? "theme-light" : "theme-dark";
+    body.classList.add(nextClass);
+    body.dataset.theme = theme;
+    window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")),
+      toggleTheme: () => setTheme((prev) => (prev === "dark" ? "light" : "dark")),
       setTheme
     }),
     [theme]
@@ -52,7 +53,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider");
+    throw new Error("useTheme must be used within ThemeProvider");
   }
   return context;
 }
