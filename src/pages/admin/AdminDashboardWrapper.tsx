@@ -23,7 +23,7 @@ export default function AdminDashboardWrapper() {
         { label: "Upload Receipt", icon: <FiUploadCloud />, path: "/dashboard/admin/upload" },
         { label: "AI Assistant", icon: <FaRobot />, path: "/dashboard/admin/assistant" },
         { label: "Settings", icon: <FiSettings />, path: "/dashboard/admin/settings" },
-        { label: "Expense Categories", icon: <FiPieChart /> },
+        { label: "Expense Categories", icon: <FiPieChart />, path: "/dashboard/admin/categories" },
         { label: "Anomaly Detection", icon: <FiActivity /> },
         { label: "Reports", icon: <FiBarChart2 /> },
         { label: "User Management", icon: <FiUserCheck /> },

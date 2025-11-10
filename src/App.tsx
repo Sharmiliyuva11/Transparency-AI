@@ -12,6 +12,7 @@ import AdminOverview from "./pages/admin/AdminOverview";
 import AdminAssistant from "./pages/admin/AdminAssistant";
 import AdminUpload from "./pages/admin/AdminUpload";
 import AdminSettings from "./pages/admin/AdminSettings";
+import ExpenseCategories from "./pages/admin/ExpenseCategories";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="upload" element={<AdminUpload />} />
         <Route path="assistant" element={<AdminAssistant />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="categories" element={<ExpenseCategories />} />
       </Route>
       <Route path="/dashboard/auditor" element={<AuditorDashboard />} />
       <Route path="/dashboard/employee" element={<EmployeeDashboard />}>
