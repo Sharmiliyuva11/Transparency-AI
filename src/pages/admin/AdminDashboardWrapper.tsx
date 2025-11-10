@@ -20,17 +20,16 @@ export default function AdminDashboardWrapper() {
       appName="AI Expense Transparency"
       sidebarLinks={[
         { label: "Dashboard Overview", icon: <FiGrid />, path: "/dashboard/admin" },
-        { label: "Upload Receipt", icon: <FiUploadCloud /> },
-        { label: "My Expenses", icon: <FiFolder /> },
+        { label: "Upload Receipt", icon: <FiUploadCloud />, path: "/dashboard/admin/upload" },
         { label: "AI Assistant", icon: <FaRobot />, path: "/dashboard/admin/assistant" },
-        { label: "Settings", icon: <FiSettings /> },
+        { label: "Settings", icon: <FiSettings />, path: "/dashboard/admin/settings" },
         { label: "Expense Categories", icon: <FiPieChart /> },
         { label: "Anomaly Detection", icon: <FiActivity /> },
         { label: "Reports", icon: <FiBarChart2 /> },
         { label: "User Management", icon: <FiUserCheck /> },
         { label: "AI Insights", icon: <FiBookOpen /> }
       ]}
-      footerLinks={[{ label: "Support", icon: <FiList /> }]}
+      footerLinks={[]}
       title="Smart Auditor AI"
       subtitle="Conversational insights to keep your spend compliant"
       userName="Admin User"

@@ -10,6 +10,8 @@ import Settings from "./pages/employee/Settings";
 import AdminDashboardWrapper from "./pages/admin/AdminDashboardWrapper";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminAssistant from "./pages/admin/AdminAssistant";
+import AdminUpload from "./pages/admin/AdminUpload";
+import AdminSettings from "./pages/admin/AdminSettings";
 
 export default function App() {
   return (
@@ -17,7 +19,9 @@ export default function App() {
       <Route path="/" element={<LoginPage />} />
       <Route path="/dashboard/admin" element={<AdminDashboardWrapper />}>
         <Route index element={<AdminOverview />} />
+        <Route path="upload" element={<AdminUpload />} />
         <Route path="assistant" element={<AdminAssistant />} />
+        <Route path="settings" element={<AdminSettings />} />
       </Route>
       <Route path="/dashboard/auditor" element={<AuditorDashboard />} />
       <Route path="/dashboard/employee" element={<EmployeeDashboard />}>
