@@ -24,9 +24,9 @@ export default function AdminDashboardWrapper() {
         { label: "AI Assistant", icon: <FaRobot />, path: "/dashboard/admin/assistant" },
         { label: "Settings", icon: <FiSettings />, path: "/dashboard/admin/settings" },
         { label: "Expense Categories", icon: <FiPieChart />, path: "/dashboard/admin/categories" },
-        { label: "Anomaly Detection", icon: <FiActivity /> },
-        { label: "Reports", icon: <FiBarChart2 /> },
-        { label: "User Management", icon: <FiUserCheck /> },
+        { label: "Anomaly Detection", icon: <FiActivity />, path: "/dashboard/admin/anomaly-detection" },
+        { label: "Reports", icon: <FiBarChart2 />, path: "/dashboard/admin/reports" },
+        { label: "User Management", icon: <FiUserCheck />, path: "/dashboard/admin/user-management" },
         { label: "AI Insights", icon: <FiBookOpen /> }
       ]}
       footerLinks={[]}

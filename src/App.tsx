@@ -13,6 +13,9 @@ import AdminAssistant from "./pages/admin/AdminAssistant";
 import AdminUpload from "./pages/admin/AdminUpload";
 import AdminSettings from "./pages/admin/AdminSettings";
 import ExpenseCategories from "./pages/admin/ExpenseCategories";
+import AnomalyDetection from "./pages/admin/AnomalyDetection";
+import UserManagement from "./pages/admin/UserManagement";
+import Reports from "./pages/admin/Reports";
 
 export default function App() {
   return (
@@ -24,6 +27,9 @@ export default function App() {
         <Route path="assistant" element={<AdminAssistant />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="categories" element={<ExpenseCategories />} />
+        <Route path="anomaly-detection" element={<AnomalyDetection />} />
+        <Route path="user-management" element={<UserManagement />} />
+        <Route path="reports" element={<Reports />} />
       </Route>
       <Route path="/dashboard/auditor" element={<AuditorDashboard />} />
       <Route path="/dashboard/employee" element={<EmployeeDashboard />}>
