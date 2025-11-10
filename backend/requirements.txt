@@ -1,0 +1,5 @@
+Flask==2.3.3
+pytesseract==0.3.10
+Pillow==10.0.1
+opencv-python==4.8.1.78
+flask-cors==4.0.0

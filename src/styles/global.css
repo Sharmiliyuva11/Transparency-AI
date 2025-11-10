@@ -1009,6 +1009,72 @@ button {
   flex-wrap: wrap;
 }
 
+.insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.insight-detail-card {
+  background: var(--surface-card-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: background 0.35s ease, border 0.35s ease, transform 0.2s ease;
+}
+
+.insight-detail-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-blue);
+}
+
+.insight-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.insight-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-icon);
+  border: 1px solid var(--border-soft);
+  display: grid;
+  place-content: center;
+  color: var(--accent-blue);
+  transition: background 0.35s ease, border 0.35s ease;
+}
+
+.insight-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.insight-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.insight-details {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  background: var(--surface-input);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  margin: 0;
+  transition: background 0.35s ease, border 0.35s ease;
+}
+
 @media (max-width: 1024px) {
   .dashboard-layout {
     grid-template-columns: 1fr;
