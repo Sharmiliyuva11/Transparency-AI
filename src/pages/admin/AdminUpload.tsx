@@ -57,7 +57,7 @@ export default function AdminUpload() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:5000/ocr", {
+      const res = await fetch("http://127.0.0.1:5000/ocr", {
         method: "POST",
         body: formData,
       });
@@ -72,7 +72,7 @@ export default function AdminUpload() {
       }
     } catch (err) {
       console.error(err);
-      setOcrText("Error connecting to server.");
+      setOcrText("❌ Error connecting to server.");
       setUploadStatus("Error");
     } finally {
       setLoading(false);
@@ -109,7 +109,7 @@ export default function AdminUpload() {
               disabled={!file || loading}
               onClick={handleUpload}
             >
-              {loading ? "Processing..." : "Choose File"}
+              {loading ? "Processing..." : "Upload & Extract"}
             </button>
           </div>
         </div>
