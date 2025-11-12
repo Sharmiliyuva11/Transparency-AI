@@ -4,11 +4,10 @@ import os
 from utils.ocr import extract_text_from_image
 
 app = Flask(__name__)
-CORS(app)  # Allow requests from frontend (CORS enabled)
+CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @app.route('/')
@@ -31,7 +30,7 @@ def ocr():
 
     try:
         text = extract_text_from_image(filepath)
-        os.remove(filepath)  # Clean up after processing
+        os.remove(filepath)  # clean up after processing
         return jsonify({'text': text})
     except Exception as e:
         if os.path.exists(filepath):
@@ -40,5 +39,5 @@ def ocr():
         return jsonify({'error': str(e)}), 500
 
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=True)

@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import AuditorDashboard from "./pages/AuditorDashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import LoginPage from "./pages/LoginPage";
 import Overview from "./pages/employee/Overview";
@@ -17,6 +16,9 @@ import AnomalyDetection from "./pages/admin/AnomalyDetection";
 import UserManagement from "./pages/admin/UserManagement";
 import Reports from "./pages/admin/Reports";
 import AIInsights from "./pages/admin/AIInsights";
+import AuditorDashboardWrapper from "./pages/auditor/AuditorDashboardWrapper";
+import AuditorOverview from "./pages/auditor/AuditorOverview";
+import AllExpenses from "./pages/auditor/AllExpenses";
 
 export default function App() {
   return (
@@ -33,7 +35,10 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="ai-insights" element={<AIInsights />} />
       </Route>
-      <Route path="/dashboard/auditor" element={<AuditorDashboard />} />
+      <Route path="/dashboard/auditor" element={<AuditorDashboardWrapper />}>
+        <Route index element={<AuditorOverview />} />
+        <Route path="all-expenses" element={<AllExpenses />} />
+      </Route>
       <Route path="/dashboard/employee" element={<EmployeeDashboard />}>
         <Route index element={<Overview />} />
         <Route path="upload" element={<Upload />} />

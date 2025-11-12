@@ -1,344 +1,351 @@
 import React from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { FiHome, FiSearch, FiSettings, FiBarChart } from 'react-icons/fi';
+import { AlertTriangle, Clock, CheckCircle, Target } from 'lucide-react';
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { SidebarItem } from '../components/DashboardLayout';
 
 const auditorSidebarItems: SidebarItem[] = [
-  { label: 'Dashboard', icon: <FiHome />, active: true },
-  { label: 'Audit Review', icon: <FiSearch /> },
+  { label: 'Dashboard', icon: <FiHome />, active: false },
+  { label: 'Anomaly Review', icon: <FiSearch />, active: true },
   { label: 'Analytics', icon: <FiBarChart /> },
   { label: 'Settings', icon: <FiSettings /> },
 ];
 
-const MOCK_EXPENSES = [
-  { 
-    id: '1', 
-    date: '2025-11-01', 
-    user: 'Sarah Johnson',
-    vendor: 'Global Airlines', 
-    amount: 5900, 
-    category: 'Travel', 
-    status: 'flagged' as const
+// Mock data for stats cards
+const STATS_DATA = [
+  {
+    title: 'Total Flagged',
+    value: '6',
+    subtitle: 'This month',
+    icon: AlertTriangle,
+    bgColor: 'bg-red-500/10',
+    iconColor: 'text-red-500',
+    borderColor: 'border-red-500/20',
   },
-  { 
-    id: '2', 
-    date: '2025-10-25', 
-    user: 'Emily Davis',
-    vendor: 'Restaurant Plaza', 
-    amount: 450, 
-    category: 'Food', 
-    status: 'pending' as const
+  {
+    title: 'Pending Reviews',
+    value: '4',
+    subtitle: 'Awaiting admin action',
+    icon: Clock,
+    bgColor: 'bg-yellow-500/10',
+    iconColor: 'text-yellow-500',
+    borderColor: 'border-yellow-500/20',
   },
-  { 
-    id: '3', 
-    date: '2025-10-20', 
-    user: 'Emily Davis',
-    vendor: 'ABC Tax Service', 
-    amount: 2500, 
-    category: 'Office', 
-    status: 'flagged' as const
+  {
+    title: 'Approved After Review',
+    value: '12',
+    subtitle: 'False positives',
+    icon: CheckCircle,
+    bgColor: 'bg-green-500/10',
+    iconColor: 'text-green-500',
+    borderColor: 'border-green-500/20',
   },
-  { 
-    id: '4', 
-    date: '2025-10-15', 
+  {
+    title: 'AI Accuracy',
+    value: '94.8%',
+    subtitle: 'Detection accuracy',
+    icon: Target,
+    bgColor: 'bg-blue-500/10',
+    iconColor: 'text-blue-500',
+    borderColor: 'border-blue-500/20',
+  },
+];
+
+// Mock data for line chart
+const ANOMALIES_OVER_TIME = [
+  { month: 'May', count: 9 },
+  { month: 'Jun', count: 12 },
+  { month: 'Jul', count: 7 },
+  { month: 'Aug', count: 10 },
+  { month: 'Sep', count: 6 },
+  { month: 'Oct', count: 8 },
+];
+
+// Mock data for pie chart
+const ANOMALY_REASONS = [
+  { name: 'Duplicate Receipt', value: 40, color: '#ef4444' },
+  { name: 'Excessive Amount', value: 20, color: '#f97316' },
+  { name: 'Unusual Vendor', value: 15, color: '#94a3b8' },
+  { name: 'Missing Receipt', value: 10, color: '#eab308' },
+  { name: 'Others', value: 10, color: '#64748b' },
+];
+
+// Mock data for flagged transactions
+const FLAGGED_TRANSACTIONS = [
+  {
+    date: '2025-11-03',
     user: 'Mike Chan',
-    vendor: 'Conference Center', 
-    amount: 3500, 
-    category: 'Misc', 
-    status: 'pending' as const
+    vendor: 'Global Airlines',
+    amount: '$8,000',
+    reason: 'Duplicate Receipt',
+    reasonColor: 'bg-red-500/20 text-red-400 border-red-500/30',
+    severity: 'high',
+    severityColor: 'bg-red-500/20 text-red-400',
+    confidence: '97%',
   },
-];
-
-const MOCK_COMPLIANCE_DATA = [
-  { name: 'Compliant', value: 94 },
-  { name: 'Non-Compliant', value: 6 },
-];
-
-const MOCK_AUDIT_STATS = [
-  { month: 'Jul', percentage: 92 },
-  { month: 'Aug', percentage: 94 },
-  { month: 'Sep', percentage: 93 },
-  { month: 'Oct', percentage: 94 },
+  {
+    date: '2025-11-02',
+    user: 'Sarah Johnson',
+    vendor: 'ABC Taxi Service',
+    amount: '$2,500',
+    reason: 'Excessive Amount',
+    reasonColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    severity: 'medium',
+    severityColor: 'bg-yellow-500/20 text-yellow-400',
+    confidence: '89%',
+  },
+  {
+    date: '2025-11-01',
+    user: 'Robert Brown',
+    vendor: 'Unknown Store XYZ',
+    amount: '$780',
+    reason: 'Unusual Vendor',
+    reasonColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    severity: 'low',
+    severityColor: 'bg-blue-500/20 text-blue-400',
+    confidence: '76%',
+  },
+  {
+    date: '2025-10-30',
+    user: 'Lisa Anderson',
+    vendor: 'Cash Payment',
+    amount: '$1,200',
+    reason: 'Missing Receipt',
+    reasonColor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    severity: 'high',
+    severityColor: 'bg-red-500/20 text-red-400',
+    confidence: '100%',
+  },
+  {
+    date: '2025-10-28',
+    user: 'David Wilson',
+    vendor: 'Restaurant XYZ',
+    amount: '$950',
+    reason: 'Date Mismatch',
+    reasonColor: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    severity: 'medium',
+    severityColor: 'bg-yellow-500/20 text-yellow-400',
+    confidence: '82%',
+  },
+  {
+    date: '2025-10-25',
+    user: 'Mike Chan',
+    vendor: 'Hotel Chain',
+    amount: '$450',
+    reason: 'Unusual Pattern',
+    reasonColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+    severity: 'low',
+    severityColor: 'bg-blue-500/20 text-blue-400',
+    confidence: '71%',
+  },
 ];
 
 export const AuditorDashboard: React.FC = () => {
-  // reference mock data so TypeScript doesn't mark them as unused during build
-  void MOCK_EXPENSES;
-  void MOCK_COMPLIANCE_DATA;
-  void MOCK_AUDIT_STATS;
   return (
     <DashboardLayout
       role="Auditor"
       user="Jane Smith"
       sidebarItems={auditorSidebarItems}
     >
-      <div className="flex h-screen bg-gray-900">
-        {/* Left Side - AI Assistant */}
-        <div className="w-1/2 p-6 border-r border-gray-700">
-          <div className="bg-gray-800 rounded-lg p-6 h-full flex flex-col">
-            {/* AI Header */}
-            <div className="mb-6">
-              <div className="flex items-center mb-4">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-green-400 text-sm font-medium">Always online and ready to help</span>
+      <div className="min-h-screen bg-[#0a0e1a] p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold text-white mb-1">Anomaly Detection</h1>
+            <p className="text-gray-400 text-sm">AI-powered fraud and suspicious transaction monitoring</p>
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors">
+            <span>All Severities</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {STATS_DATA.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={index}
+                className={`${stat.bgColor} border ${stat.borderColor} rounded-lg p-5`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                    <Icon className={`w-5 h-5 ${stat.iconColor}`} />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
+                <div className="text-sm text-gray-400 mb-1">{stat.title}</div>
+                <div className="text-xs text-gray-500">{stat.subtitle}</div>
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Smart Auditor AI</h2>
-              <p className="text-gray-400 text-sm">Online</p>
-            </div>
+            );
+          })}
+        </div>
 
-            {/* Greeting */}
-            <div className="mb-6">
-              <p className="text-white text-lg">
-                Hello! I'm Smart Auditor AI, your intelligent expense assistant. I can help you with:
-              </p>
-              <ul className="text-gray-300 text-sm mt-3 space-y-1">
-                <li>• Analyzing expense patterns and trends</li>
-                <li>• Explaining flagged transactions</li>
-                <li>• Providing insights on spending optimization</li>
-                <li>• Answering questions about your financial data</li>
-                <li>• Recommending cost-saving opportunities</li>
-              </ul>
-              <p className="text-white text-lg mt-4">How can I assist you today?</p>
-            </div>
+        {/* Charts Section */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Line Chart */}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Anomalies Over Time</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={ANOMALIES_OVER_TIME}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="month" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1f2937',
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#fff',
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  dot={{ fill: '#ef4444', r: 5 }}
+                  activeDot={{ r: 7 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
-            {/* Suggested Questions */}
-            <div className="mb-6">
-              <h3 className="text-white font-medium mb-3">Suggested Questions</h3>
-              <div className="space-y-2">
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  Why was the Global Airlines transaction flagged?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  What are my top spending categories?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  How can I improve my expense integrity score?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  Explain the recent anomalies detected
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  What cost-saving opportunities are available?
-                </button>
-              </div>
-            </div>
-
-            {/* AI Capabilities */}
-            <div className="mb-6">
-              <h3 className="text-white font-medium mb-3">AI Capabilities</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Trend Analysis</h4>
-                  <p className="text-gray-400 text-xs">Identify spending patterns</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Anomaly Detection</h4>
-                  <p className="text-gray-400 text-xs">Explain flagged transactions</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Report Generation</h4>
-                  <p className="text-gray-400 text-xs">Custom insights on demand</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Smart Recommendations</h4>
-                  <p className="text-gray-400 text-xs">Cost-saving opportunities</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="mt-auto">
-              <h3 className="text-white font-medium mb-3">Quick Stats</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Response Time</p>
-                  <p className="text-gray-400 text-sm">&lt; 2 sec</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Accuracy Rate</p>
-                  <p className="text-gray-400 text-sm">94.8%</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Questions Answered</p>
-                  <p className="text-gray-400 text-sm">this</p>
-                </div>
+          {/* Pie Chart */}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Anomaly Reason Distribution</h3>
+            <div className="flex items-center justify-between">
+              <ResponsiveContainer width="50%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={ANOMALY_REASONS}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {ANOMALY_REASONS.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1f2937',
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                      color: '#fff',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-3">
+                {ANOMALY_REASONS.map((reason, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: reason.color }}
+                      />
+                      <span className="text-sm text-gray-300">{reason.name}</span>
+                    </div>
+                    <span className="text-sm font-medium text-white">{reason.value}%</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side - Settings */}
-        <div className="w-1/2 p-6">
-          <div className="bg-gray-800 rounded-lg p-6 h-full overflow-y-auto">
-            <h1 className="text-2xl font-semibold text-white mb-6">Settings</h1>
+        {/* Flagged Transactions Table */}
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <h3 className="text-lg font-semibold text-white">Flagged Transactions</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Date</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">User</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Vendor</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Amount</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Reason</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Severity</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">AI Confidence</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {FLAGGED_TRANSACTIONS.map((transaction, index) => (
+                  <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                    <td className="py-3 px-4 text-sm text-gray-300">{transaction.date}</td>
+                    <td className="py-3 px-4 text-sm text-gray-300">{transaction.user}</td>
+                    <td className="py-3 px-4 text-sm text-gray-300">{transaction.vendor}</td>
+                    <td className="py-3 px-4 text-sm text-white font-medium">{transaction.amount}</td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${transaction.reasonColor}`}>
+                        {transaction.reason}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${transaction.severityColor}`}>
+                        {transaction.severity}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-white font-medium">{transaction.confidence}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-2">
+                        <button className="flex items-center gap-1 px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/30 transition-colors border border-green-500/30">
+                          <CheckCircle className="w-3 h-3" />
+                          Valid
+                        </button>
+                        <button className="flex items-center gap-1 px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/30 transition-colors border border-red-500/30">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {/* Profile Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">User Profile</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your full name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
-                  <input
-                    type="email"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your email"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Department</label>
-                  <select className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select department</option>
-                    <option value="engineering">Engineering</option>
-                    <option value="finance">Finance</option>
-                    <option value="hr">Human Resources</option>
-                    <option value="operations">Operations</option>
-                  </select>
-                </div>
+        {/* AI Explainability Section */}
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold text-white">AI Explainability - Recent Flags</h3>
+                <span className="text-xs font-medium text-red-400 bg-red-500/20 px-2 py-1 rounded">HIGH</span>
               </div>
-            </div>
-
-            {/* Password Change Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Change Password</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Current Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter new password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Confirm new password"
-                  />
-                </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                  Save Changes
-                </button>
-              </div>
-            </div>
-
-            {/* Organization Settings */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Organization</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Organization Name</label>
-                  <input
-                    type="text"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter organization name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Industry</label>
-                  <select className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select industry</option>
-                    <option value="technology">Technology</option>
-                    <option value="finance">Finance</option>
-                    <option value="healthcare">Healthcare</option>
-                    <option value="retail">Retail</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Settings */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">AI Settings</h2>
-              <div className="space-y-4">
+              <p className="text-sm text-gray-300 mb-3">
+                <span className="font-medium text-white">Global Airlines - $8,000</span>
+              </p>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                <span className="font-medium text-red-400">Duplicate Receipt Detected:</span> Two identical receipts for $8,000 were submitted on the same day by the same user. Receipt numbers match, suggesting potential double-billing.
+              </p>
+              <div className="mt-3 pt-3 border-t border-red-500/20">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Enable Smart Suggestions</h3>
-                    <p className="text-gray-400 text-sm">Receive AI-powered expense insights</p>
+                  <span className="text-xs text-gray-400">Confidence Level</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-red-500" style={{ width: '97%' }} />
+                    </div>
+                    <span className="text-xs font-medium text-white">97% confidence</span>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Auto-analyze New Expenses</h3>
-                    <p className="text-gray-400 text-sm">Automatically flag suspicious transactions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Notifications */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Notifications</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Email Notifications</h3>
-                    <p className="text-gray-400 text-sm">Receive updates via email</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Flagged Expense Alerts</h3>
-                    <p className="text-gray-400 text-sm">Get notified of suspicious transactions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Weekly Reports</h3>
-                    <p className="text-gray-400 text-sm">Receive weekly expense summaries</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Support & Help */}
-            <div>
-              <h2 className="text-lg font-medium text-white mb-4">Support & Help</h2>
-              <p className="text-gray-400 text-sm mb-4">Need assistance? Contact our support team or check our documentation.</p>
-              <div className="space-y-3">
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors text-left">
-                  View Documentation
-                </button>
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors text-left">
-                  Contact Support
-                </button>
               </div>
             </div>
           </div>
