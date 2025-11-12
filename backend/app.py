@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-from utils.ocr import extract_text_from_image
+from backend.utils.ocr import extract_text_from_image
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS so frontend can call API
