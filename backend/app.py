@@ -1,20 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-from backend.utils.ocr import extract_text_from_image
+from utils.ocr import extract_text_from_image  # ✅ Correct import
 
-app = Flask(__name__)
-CORS(app)  # Allow requests from frontend
+app = Flask(_name_)
+CORS(app)  # Enable CORS for frontend communication
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-
 @app.route('/')
 def home():
     return "✅ Transparency-AI OCR backend is running successfully!"
-
 
 @app.route('/ocr', methods=['POST'])
 def ocr():
@@ -27,19 +25,16 @@ def ocr():
 
     filepath = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(filepath)
-    print(f"📥 Received file: {file.filename}")
+    print("📄 Received file:", file.filename)
 
     try:
         text = extract_text_from_image(filepath)
-        os.remove(filepath)  # clean up after processing
+        os.remove(filepath)  # Clean up after processing
         return jsonify({'text': text})
     except Exception as e:
         if os.path.exists(filepath):
             os.remove(filepath)
-        print("❌ Error in OCR:", e)
         return jsonify({'error': str(e)}), 500
 
-
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
-
+if _name_ == '_main_':
+    app.run(debug=True, port=5000)
