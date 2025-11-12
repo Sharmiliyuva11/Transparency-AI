@@ -13,7 +13,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 @app.route('/')
 def home():
-    return "✅ Transparency-AI OCR backend is running successfully!"
+    return "✅ Transparency-AI OCR backend is running successfully hurray!"
 
 
 @app.route('/ocr', methods=['POST'])
