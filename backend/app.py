@@ -7,13 +7,12 @@ app = Flask(_name_)
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @app.route('/')
 def home():
-    return "✅ Transparency-AI OCR backend is running successfully!"
+    return "✅ Transparency-AI OCR backend is running success!"
 
 
 @app.route('/ocr', methods=['POST'])
@@ -40,5 +39,5 @@ def ocr():
         return jsonify({'error': str(e)}), 500
 
 
-if _name_ == '_main_':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+if _name_ == "_main_":
+    app.run(host="127.0.0.1", port=5000, debug=True)
