@@ -55,6 +55,10 @@ const flagBadges: Record<string, string> = {
 export default function AuditorOverview() {
   return (
     <>
+      <div style={{ marginBottom: "12px" }}>
+        <h2 className="dashboard-title">Auditor Dashboard</h2>
+        <p className="dashboard-subtitle">Comprehensive oversight and compliance verification</p>
+      </div>
       <div className="grid cols-4">
         <div className="stat-card">
           <div className="stat-label">Total Transactions</div>
@@ -101,7 +105,7 @@ export default function AuditorOverview() {
           <div className="grid cols-3">
             {complianceData.map((item) => (
               <div key={item.name} className="stat-label">
-                <span className="badge blue" style={{ background: ${item.color}33, color: item.color }}>
+                <span className="badge blue" style={{ background: `${item.color}33`, color: item.color }}>
                   {item.value}%
                 </span>
                 {item.name}
