@@ -26,7 +26,6 @@ export default function AdminUpload() {
   const [uploadStatus, setUploadStatus] = useState<string>("Awaiting upload");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -35,7 +34,6 @@ export default function AdminUpload() {
     }
   };
 
-  // Handle drag & drop
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -47,7 +45,6 @@ export default function AdminUpload() {
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
 
-  // Upload file to backend
   const handleUpload = async () => {
     if (!file) return alert("Please choose a file first!");
     setLoading(true);
@@ -62,6 +59,8 @@ export default function AdminUpload() {
         body: formData,
       });
 
+      if (!res.ok) throw new Error("Server returned an error");
+
       const data = await res.json();
       if (data.text) {
         setOcrText(data.text);
@@ -71,7 +70,7 @@ export default function AdminUpload() {
         setUploadStatus("Error");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Upload error:", err);
       setOcrText("❌ Error connecting to server.");
       setUploadStatus("Error");
     } finally {
@@ -83,7 +82,6 @@ export default function AdminUpload() {
     <>
       {/* ===== Upload Section ===== */}
       <div className="grid cols-2">
-        {/* Document Upload */}
         <div className="section-card" style={{ minHeight: 320 }}>
           <div className="section-header">
             <h3>Document Upload</h3>
@@ -114,7 +112,6 @@ export default function AdminUpload() {
           </div>
         </div>
 
-        {/* OCR Preview */}
         <div className="section-card" style={{ minHeight: 320 }}>
           <div className="section-header">
             <h3>OCR Extraction Preview</h3>
@@ -132,7 +129,10 @@ export default function AdminUpload() {
               {uploadStatus}
             </span>
           </div>
-          <div className="upload-preview" style={{ height: 220, overflowY: "auto" }}>
+          <div
+            className="upload-preview"
+            style={{ height: 220, overflowY: "auto" }}
+          >
             {ocrText === "Awaiting upload"
               ? "Upload a document to see extracted data"
               : ocrText}
