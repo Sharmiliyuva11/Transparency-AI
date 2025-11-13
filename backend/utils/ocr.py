@@ -16,4 +16,10 @@ def extract_text_from_image(image_path: str) -> str:
         text = pytesseract.image_to_string(image)
         return text.strip()
     except Exception as e:
+<<<<<<< HEAD
         raise RuntimeError(f"OCR processing failed: {str(e)}")
+
+
+=======
+        raise RuntimeError(f"OCR processing failed: {str(e)}")
+>>>>>>> 5d9f49f810b56c723a2db7bcb6c8408960d36b27
