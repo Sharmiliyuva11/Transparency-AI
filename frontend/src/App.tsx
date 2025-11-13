@@ -3,6 +3,7 @@ import './App.css'
 
 import AIAssistantPage from './pages/AIAssistantPage'
 import SettingsPage from './pages/SettingsPage'
+import { AuditorDashboard } from './pages/AuditorDashboard'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
             <ul>
               <li><Link to="/admin/ai">Admin - AI Assistant</Link></li>
               <li><Link to="/admin/settings">Admin - Settings</Link></li>
+              <li><Link to="/auditor/anomaly-review">Auditor - Anomaly Review</Link></li>
               <li><Link to="/auditor/ai">Auditor - AI Assistant</Link></li>
               <li><Link to="/auditor/settings">Auditor - Settings</Link></li>
               <li><Link to="/employee/ai">Employee - AI Assistant</Link></li>
@@ -26,6 +28,7 @@ function App() {
         <main className="app-main">
           <Routes>
             <Route path="/admin/ai" element={<AIAssistantPage role="Admin" />} />
+            <Route path="/auditor/anomaly-review" element={<AuditorDashboard />} />
             <Route path="/auditor/ai" element={<AIAssistantPage role="Auditor" />} />
             <Route path="/employee/ai" element={<AIAssistantPage role="Employee" />} />
 
