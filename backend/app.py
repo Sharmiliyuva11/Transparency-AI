@@ -270,8 +270,4 @@ def get_expenses_stats():
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     app.run(host="127.0.0.1", port=5000, debug=True)
-=======
-    app.run(host="127.0.0.1", port=5000, debug=True)
->>>>>>> 5d9f49f810b56c723a2db7bcb6c8408960d36b27
