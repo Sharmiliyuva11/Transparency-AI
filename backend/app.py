@@ -9,30 +9,16 @@ from flask_cors import CORS
 from transformers import pipeline
 
 from utils.ocr import extract_text_from_image
+from utils.classifier import load_categories, classify_text
 
 app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
-CATEGORY_LABELS = [
-    "Travel",
-    "Food",
-    "Lodging",
-    "Transportation",
-    "Entertainment",
-    "Utilities",
-    "Office Supplies",
-    "Miscellaneous"
-]
+FINAL_CATEGORY_LIST = load_categories()
 RECENT_UPLOAD_LIMIT = 25
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-try:
-    zero_shot_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-except Exception as classification_error:
-    zero_shot_classifier = None
-    print("Zero-shot classifier unavailable:", classification_error)
 
 try:
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
@@ -79,21 +65,6 @@ def extract_entities(text: str) -> Dict:
         return {"vendor": "", "date": "", "total": extract_amount(text)}
 
 
-def classify_text(text: str) -> Dict[str, float]:
-    if zero_shot_classifier is None:
-        return {"label": "Uncategorized", "score": 0.0}
-    cleaned_text = text.strip()
-    if not cleaned_text:
-        return {"label": "Uncategorized", "score": 0.0}
-    truncated_text = cleaned_text[:512]
-    result = zero_shot_classifier(truncated_text, CATEGORY_LABELS)
-    labels = result.get("labels", [])
-    scores = result.get("scores", [])
-    if not labels or not scores:
-        return {"label": "Uncategorized", "score": 0.0}
-    return {"label": labels[0], "score": float(scores[0])}
-
-
 @app.route('/')
 def home():
     return jsonify({'status': 'success', 'message': '✅ Transparency-AI OCR backend is running successfully!'})
@@ -113,15 +84,15 @@ def ocr():
 
     try:
         text = extract_text_from_image(filepath)
-        classification = classify_text(text)
+        category = classify_text(text)
         entities = extract_entities(text)
-        
+
         entry = {
             'file': file.filename,
             'uploadedAt': datetime.utcnow().isoformat() + 'Z',
             'status': 'Processed' if text else 'Needs Review',
-            'category': classification['label'],
-            'confidence': classification['score'],
+            'category': category,
+            'confidence': 0.0,
             'textPreview': text[:200],
             'vendor': entities['vendor'],
             'total': entities['total']
@@ -129,11 +100,11 @@ def ocr():
         recent_uploads.appendleft(entry)
         all_expenses.append(entry)
         os.remove(filepath)
-        
+
         return jsonify({
             'success': True,
             'text': text,
-            'classification': classification,
+            'classification': {'label': category, 'score': 0.0},
             'entities': entities
         })
     except Exception as error:
@@ -150,17 +121,17 @@ def analyze():
     
     text = data['text']
     try:
-        classification = classify_text(text)
+        category = classify_text(text)
         entities = extract_entities(text)
-        
+
         response = {
             'success': True,
             'text': text,
-            'classification': classification,
+            'classification': {'label': category, 'score': 0.0},
             'entities': entities,
             'length': len(text)
         }
-        
+
         return jsonify(response)
     except Exception as error:
         return jsonify({'error': str(error)}), 500
@@ -171,11 +142,14 @@ def classify():
     data = request.get_json()
     if not data or 'text' not in data:
         return jsonify({'error': 'No text provided'}), 400
-    
+
     text = data['text']
     try:
-        classification = classify_text(text)
-        return jsonify({'success': True, 'classification': classification})
+        predicted_category = classify_text(text)
+        return jsonify({
+            'predicted_category': predicted_category,
+            'all_categories': FINAL_CATEGORY_LIST
+        })
     except Exception as error:
         return jsonify({'error': str(error)}), 500
 
@@ -208,7 +182,7 @@ def health():
     return jsonify({
         'status': 'healthy',
         'ocr': 'available',
-        'classifier': 'available' if zero_shot_classifier else 'unavailable',
+        'classifier': 'available',
         'ner': 'available' if ner_pipeline else 'unavailable',
         'sentiment': 'available' if sentiment_pipeline else 'unavailable'
     })

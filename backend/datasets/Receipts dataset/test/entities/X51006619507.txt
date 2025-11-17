@@ -1,0 +1,6 @@
+{
+    "company": "GOLDEN ARCHES RESTAURANTS SDN BHD",
+    "date": "03/12/2016",
+    "address": "NO.3, JALAN SS21/39,47400 PETALING JAYA SELANGOR",
+    "total": "14.70"
+}
