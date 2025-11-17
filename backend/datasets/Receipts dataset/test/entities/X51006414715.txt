@@ -1,6 +1,0 @@
-{
-    "company": "SECRET RECIPE RESTAURANT",
-    "date": "4/22/2018",
-    "address": "LOT G16, PERMAS JAYA JUSCO",
-    "total": "RM41.81"
-}
