@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-// Imported components intentionally removed because they are not used in this file yet.
-
 import { FiHome, FiUpload, FiList, FiSettings } from 'react-icons/fi';
 import type { SidebarItem } from '../components/DashboardLayout';
+import { apiService, Expense, ExpenseStats } from '../services/api';
 
 const employeeSidebarItems: SidebarItem[] = [
   { label: 'Dashboard', icon: <FiHome />, active: true },
@@ -34,10 +33,35 @@ const MOCK_TREND_DATA = [
 ];
 
 export const EmployeeDashboard: React.FC = () => {
-  // reference mock data so TypeScript doesn't mark them as unused during build
-  void MOCK_EXPENSES;
-  void MOCK_CATEGORY_DATA;
-  void MOCK_TREND_DATA;
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [stats, setStats] = useState<ExpenseStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const [expensesData, statsData] = await Promise.all([
+          apiService.getExpenses(),
+          apiService.getExpenseStats()
+        ]);
+
+        if (expensesData.success) {
+          setExpenses(expensesData.expenses);
+        }
+        if (statsData.success) {
+          setStats(statsData);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
   return (
     <DashboardLayout
       role="Employee"
@@ -139,188 +163,109 @@ export const EmployeeDashboard: React.FC = () => {
           </div>
         </div>
 
-<<<<<<< Updated upstream
-        {/* Recent Expenses Table */}
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-medium text-white mb-4">My Recent Expenses</h2>
-          <ExpenseTable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ={MOCK_EXPENSES} />
-=======
-        {/* Right Side - Settings */}
+        {/* Right Side - Dashboard Overview */}
         <div className="w-1/2 p-6">
-          <div className="bg-gray-800 rounded-lg p-6 h-full overflow-y-auto">
-            <h1 className="text-2xl font-semibold text-white mb-6">Settings</h1>
-
-            {/* Profile Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">User Profile</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your full name"
-                  />
+          <div className="h-full overflow-y-auto space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Expenses</p>
+                    <p className="text-white text-2xl font-bold">
+                      {loading ? '...' : stats ? `$${stats.total_amount.toFixed(2)}` : '$0.00'}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                    <span className="text-blue-400 text-lg">💰</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
-                  <input
-                    type="email"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your email"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Department</label>
-                  <select className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select department</option>
-                    <option value="engineering">Engineering</option>
-                    <option value="finance">Finance</option>
-                    <option value="hr">Human Resources</option>
-                    <option value="operations">Operations</option>
-                  </select>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Count</p>
+                    <p className="text-white text-2xl font-bold">
+                      {loading ? '...' : stats ? stats.total_expenses : 0}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                    <span className="text-green-400 text-lg">📊</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Password Change Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Change Password</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Current Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter new password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Confirm new password"
-                  />
-                </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                  Save Changes
-                </button>
-              </div>
-            </div>
-
-            {/* Organization Settings */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Organization</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Organization Name</label>
-                  <input
-                    type="text"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter organization name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Industry</label>
-                  <select className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select industry</option>
-                    <option value="technology">Technology</option>
-                    <option value="finance">Finance</option>
-                    <option value="healthcare">Healthcare</option>
-                    <option value="retail">Retail</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Settings */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">AI Settings</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Enable Smart Suggestions</h3>
-                    <p className="text-gray-400 text-sm">Receive AI-powered expense insights</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Auto-analyze New Expenses</h3>
-                    <p className="text-gray-400 text-sm">Automatically flag suspicious transactions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Notifications */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-white mb-4">Notifications</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Email Notifications</h3>
-                    <p className="text-gray-400 text-sm">Receive updates via email</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Flagged Expense Alerts</h3>
-                    <p className="text-gray-400 text-sm">Get notified of suspicious transactions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">Weekly Reports</h3>
-                    <p className="text-gray-400 text-sm">Receive weekly expense summaries</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Support & Help */}
-            <div>
-              <h2 className="text-lg font-medium text-white mb-4">Support & Help</h2>
-              <p className="text-gray-400 text-sm mb-4">Need assistance? Contact our support team or check our documentation.</p>
+            {/* Spending by Category Chart */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Spending by Category</h3>
               <div className="space-y-3">
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors text-left">
-                  View Documentation
-                </button>
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors text-left">
-                  Contact Support
-                </button>
+                {loading ? (
+                  <p className="text-gray-400">Loading...</p>
+                ) : stats && Object.keys(stats.by_category).length > 0 ? (
+                  Object.entries(stats.by_category).map(([category, amount], index) => {
+                    const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500'];
+                    const color = colors[index % colors.length];
+                    return (
+                      <div key={category} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 ${color} rounded`}></div>
+                          <span className="text-gray-300">{category || 'Uncategorized'}</span>
+                        </div>
+                        <span className="text-white font-medium">${amount.toFixed(2)}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-400">No expense data available</p>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Expenses */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Recent Expenses</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">DAVIS AVE</p>
+                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
+                  </div>
+                  <span className="text-white font-bold">$23,223</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">WADHWA</p>
+                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
+                  </div>
+                  <span className="text-white font-bold">$12</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">DAVIS AVE</p>
+                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
+                  </div>
+                  <span className="text-white font-bold">$23,223</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Trend */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Monthly Trend</h3>
+              <div className="flex items-end justify-between h-32">
+                <div className="flex flex-col items-center">
+                  <div className="bg-blue-500 w-8 rounded-t" style={{height: '60%'}}></div>
+                  <span className="text-gray-400 text-xs mt-2">Oct</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="bg-blue-500 w-8 rounded-t" style={{height: '80%'}}></div>
+                  <span className="text-gray-400 text-xs mt-2">Nov</span>
+                </div>
               </div>
             </div>
           </div>
->>>>>>> Stashed changes
+        </div>
         </div>
       </div>
     </DashboardLayout>
