@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FiCamera, FiCloudLightning } from "react-icons/fi";
 
 const pipelineSteps = [
@@ -8,16 +8,11 @@ const pipelineSteps = [
   { title: "Fraud Detection", description: "Flags anomalies for review" },
 ];
 
-const recentUploads = [
-  { file: "Receipt_Nov01.pdf", date: "2025-11-01", status: "Processed" },
-  { file: "Taxi_Trip_1028.png", date: "2025-10-28", status: "Processing" },
-  { file: "Dinner_Team_1025.jpg", date: "2025-10-25", status: "Flagged" },
-];
-
 const statusBadges: Record<string, string> = {
   Processed: "badge green",
   Processing: "badge yellow",
   Flagged: "badge red",
+  "Needs Review": "badge orange"
 };
 
 export default function AdminUpload() {
@@ -25,8 +20,16 @@ export default function AdminUpload() {
   const [ocrText, setOcrText] = useState<string>("Awaiting upload");
   const [uploadStatus, setUploadStatus] = useState<string>("Awaiting upload");
   const [loading, setLoading] = useState<boolean>(false);
+  const [classification, setClassification] = useState<any>(null);
+  const [entities, setEntities] = useState<any>(null);
+  const [recentUploads, setRecentUploads] = useState<any[]>([]);
 
-  // Handle file selection
+  const API_URL = "http://127.0.0.1:5000";
+
+  useEffect(() => {
+    fetchRecentUploads();
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -35,7 +38,6 @@ export default function AdminUpload() {
     }
   };
 
-  // Handle drag & drop
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -47,31 +49,49 @@ export default function AdminUpload() {
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
 
-  // Upload file to backend
+  const fetchRecentUploads = async () => {
+    try {
+      const res = await fetch(`${API_URL}/recent-uploads`);
+      const data = await res.json();
+      if (data.success && data.uploads) {
+        setRecentUploads(data.uploads);
+      }
+    } catch (err) {
+      console.error("Error fetching uploads:", err);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) return alert("Please choose a file first!");
     setLoading(true);
     setUploadStatus("Processing...");
+    setClassification(null);
+    setEntities(null);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/ocr", {
+      const res = await fetch(`${API_URL}/ocr`, {
         method: "POST",
         body: formData,
       });
 
+      if (!res.ok) throw new Error("Server returned an error");
+
       const data = await res.json();
-      if (data.text) {
-        setOcrText(data.text);
+      if (data.success) {
+        setOcrText(data.text || "No text extracted");
+        setClassification(data.classification);
+        setEntities(data.entities);
         setUploadStatus("Processed");
+        await fetchRecentUploads();
       } else {
-        setOcrText(data.error || "No text extracted.");
+        setOcrText(data.error || "Upload failed");
         setUploadStatus("Error");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Upload error:", err);
       setOcrText("❌ Error connecting to server.");
       setUploadStatus("Error");
     } finally {
@@ -83,7 +103,6 @@ export default function AdminUpload() {
     <>
       {/* ===== Upload Section ===== */}
       <div className="grid cols-2">
-        {/* Document Upload */}
         <div className="section-card" style={{ minHeight: 320 }}>
           <div className="section-header">
             <h3>Document Upload</h3>
@@ -114,7 +133,6 @@ export default function AdminUpload() {
           </div>
         </div>
 
-        {/* OCR Preview */}
         <div className="section-card" style={{ minHeight: 320 }}>
           <div className="section-header">
             <h3>OCR Extraction Preview</h3>
@@ -132,10 +150,45 @@ export default function AdminUpload() {
               {uploadStatus}
             </span>
           </div>
-          <div className="upload-preview" style={{ height: 220, overflowY: "auto" }}>
-            {ocrText === "Awaiting upload"
-              ? "Upload a document to see extracted data"
-              : ocrText}
+          <div
+            className="upload-preview"
+            style={{ height: 220, overflowY: "auto", paddingBottom: 16 }}
+          >
+            {ocrText === "Awaiting upload" ? (
+              "Upload a document to see extracted data"
+            ) : (
+              <div>
+                {classification && (
+                  <div style={{ marginBottom: 16 }}>
+                    <strong style={{ color: "#3ba8ff" }}>📁 Category:</strong>
+                    <div style={{ fontSize: 14, marginTop: 4 }}>
+                      {classification.label}
+                      <span style={{ marginLeft: 8, color: "#666" }}>
+                        ({(classification.score * 100).toFixed(1)}% confidence)
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {entities?.vendor && (
+                  <div style={{ marginBottom: 16 }}>
+                    <strong style={{ color: "#38d788" }}>🏪 Vendor:</strong>
+                    <div style={{ fontSize: 14, marginTop: 4 }}>{entities.vendor}</div>
+                  </div>
+                )}
+                {entities?.total > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <strong style={{ color: "#ffa94d" }}>💰 Amount:</strong>
+                    <div style={{ fontSize: 14, marginTop: 4 }}>${entities.total.toFixed(2)}</div>
+                  </div>
+                )}
+                <div>
+                  <strong>📄 Extracted Text:</strong>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 8 }}>
+                    {ocrText?.substring(0, 200)}...
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -160,8 +213,15 @@ export default function AdminUpload() {
       <div className="section-card">
         <div className="section-header">
           <h3>Recent Uploads</h3>
-          <a className="secondary-link" href="#">
-            View History
+          <a 
+            className="secondary-link" 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              fetchRecentUploads();
+            }}
+          >
+            Refresh
           </a>
         </div>
         <table className="table">
@@ -169,25 +229,35 @@ export default function AdminUpload() {
             <tr>
               <th>File</th>
               <th>Upload Date</th>
+              <th>Category</th>
               <th>Status</th>
-              <th>Insights</th>
+              <th>Amount</th>
             </tr>
           </thead>
           <tbody>
-            {recentUploads.map((item) => (
-              <tr key={item.file}>
-                <td>{item.file}</td>
-                <td>{item.date}</td>
-                <td>
-                  <span className={statusBadges[item.status]}>
-                    {item.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="badge blue">Ready</div>
+            {recentUploads.length > 0 ? (
+              recentUploads.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.file}</td>
+                  <td>{new Date(item.uploadedAt).toLocaleDateString()}</td>
+                  <td>
+                    <span className="badge blue">{item.category}</span>
+                  </td>
+                  <td>
+                    <span className={statusBadges[item.status]}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td>${item.total?.toFixed(2) || "0.00"}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", color: "#999" }}>
+                  No uploads yet
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

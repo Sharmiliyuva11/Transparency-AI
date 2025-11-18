@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Bar,
   BarChart,
@@ -14,69 +15,30 @@ import {
 import { FiCoffee, FiDollarSign, FiPackage, FiTrendingUp } from "react-icons/fi";
 import { FaPlane, FaUtensils } from "react-icons/fa";
 
-// Mock data for category cards
-const categoryData = [
-  { 
-    name: "Food", 
-    amount: 11200, 
-    icon: <FaUtensils />, 
-    color: "#3ba8ff",
-    bgColor: "rgba(59, 168, 255, 0.15)"
-  },
-  { 
-    name: "Travel", 
-    amount: 3450, 
-    icon: <FaPlane />, 
-    color: "#38d788",
-    bgColor: "rgba(56, 215, 136, 0.15)"
-  },
-  { 
-    name: "Utilities", 
-    amount: 2800, 
-    icon: <FiPackage />, 
-    color: "#ffa94d",
-    bgColor: "rgba(255, 169, 77, 0.15)"
-  },
-  { 
-    name: "Entertainment", 
-    amount: 1950, 
-    icon: <FiCoffee />, 
-    color: "#ff6b9d",
-    bgColor: "rgba(255, 107, 157, 0.15)"
-  },
-  { 
-    name: "Miscellaneous", 
-    amount: 2100, 
-    icon: <FiDollarSign />, 
-    color: "#c084fc",
-    bgColor: "rgba(192, 132, 252, 0.15)"
-  }
-];
+const CATEGORY_ICONS: Record<string, JSX.Element> = {
+  Food: <FaUtensils />,
+  Travel: <FaPlane />,
+  Utilities: <FiPackage />,
+  Entertainment: <FiCoffee />,
+  Miscellaneous: <FiDollarSign />
+};
 
-// Mock data for bar chart
-const barChartData = [
-  { category: "Food", value: 11200 },
-  { category: "Travel", value: 3450 },
-  { category: "Utilities", value: 2800 },
-  { category: "Entertainment", value: 1950 },
-  { category: "Misc", value: 2100 }
-];
+const CATEGORY_COLORS: Record<string, string> = {
+  Food: "#3ba8ff",
+  Travel: "#38d788",
+  Utilities: "#ffa94d",
+  Entertainment: "#ff6b9d",
+  Miscellaneous: "#c084fc",
+  Lodging: "#51cf66",
+  Transportation: "#a78bfa",
+  "Office Supplies": "#f472b6"
+};
 
-// Mock data for line chart
 const lineChartData = [
   { month: "Jul", Food: 10500, Utilities: 2600, Office: 1800, Travel: 3200 },
   { month: "Aug", Food: 10800, Utilities: 2700, Office: 1900, Travel: 3300 },
   { month: "Sep", Food: 11000, Utilities: 2750, Office: 2000, Travel: 3400 },
   { month: "Oct", Food: 11200, Utilities: 2800, Office: 2100, Travel: 3450 }
-];
-
-// Mock data for detailed table
-const detailedExpenses = [
-  { date: "2025-11-01", category: "Global Airlines", amount: "$2,000", status: "Flagged" },
-  { date: "2025-10-30", category: "ABC Tax Service", amount: "$1,450", status: "Flagged" },
-  { date: "2025-10-28", category: "Office Supplies", amount: "$850", status: "Approved" },
-  { date: "2025-10-25", category: "Travel Cab Co.", amount: "$1,085", status: "Approved" },
-  { date: "2025-10-22", category: "Food", amount: "$600", status: "Approved" }
 ];
 
 const statusBadges: Record<string, string> = {
@@ -86,6 +48,64 @@ const statusBadges: Record<string, string> = {
 };
 
 export default function ExpenseCategories() {
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [barChartData, setBarChartData] = useState<any[]>([]);
+  const [detailedExpenses, setDetailedExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = "http://localhost:5000";
+
+  useEffect(() => {
+    fetchCategoryData();
+  }, []);
+
+  const fetchCategoryData = async () => {
+    try {
+      const res = await fetch(`${API_URL}/expenses/by-category`);
+      const data = await res.json();
+
+      if (data.success && data.by_category) {
+        const categories = Object.entries(data.by_category).map(([name, catData]: [string, any]) => ({
+          name,
+          amount: catData.total,
+          icon: CATEGORY_ICONS[name] || <FiDollarSign />,
+          color: CATEGORY_COLORS[name] || "#999999",
+          bgColor: `${CATEGORY_COLORS[name] || "#999999"}26`
+        }));
+
+        setCategoryData(categories);
+
+        const barData = categories.map((cat) => ({
+          category: cat.name,
+          value: cat.amount
+        }));
+
+        setBarChartData(barData);
+
+        const allExpenses: any[] = [];
+        Object.entries(data.by_category).forEach(([_, catData]: [string, any]) => {
+          allExpenses.push(...(catData.expenses || []));
+        });
+
+        const detailedList = allExpenses
+          .slice(0, 5)
+          .map((exp: any) => ({
+            date: new Date(exp.uploadedAt).toISOString().split('T')[0],
+            category: exp.vendor || exp.category,
+            amount: `$${exp.total?.toFixed(2) || "0.00"}`,
+            status: exp.status === "Processed" ? "Approved" : exp.status
+          }));
+
+        setDetailedExpenses(detailedList);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching category data:", err);
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       {/* Header */}

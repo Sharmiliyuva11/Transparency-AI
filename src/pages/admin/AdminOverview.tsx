@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Cell,
   Line,
@@ -9,12 +10,6 @@ import {
   XAxis
 } from "recharts";
 
-const spendingByCategory = [
-  { name: "Travel", value: 62, color: "#3ba8ff" },
-  { name: "Food", value: 14, color: "#38d788" },
-  { name: "Office", value: 24, color: "#ffa94d" }
-];
-
 const monthlyTrend = [
   { month: "Jul", value: 520 },
   { month: "Aug", value: 640 },
@@ -22,13 +17,16 @@ const monthlyTrend = [
   { month: "Oct", value: 720 }
 ];
 
-const recentExpenses = [
-  { date: "2025-11-01", vendor: "Coffee Shop", amount: "$45", category: "Food", status: "Approved" },
-  { date: "2025-10-30", vendor: "Uber", amount: "$28", category: "Travel", status: "Approved" },
-  { date: "2025-10-28", vendor: "Office Depot", amount: "$120", category: "Office", status: "Pending" },
-  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$450", category: "Travel", status: "Flagged" },
-  { date: "2025-10-22", vendor: "Restaurant", amount: "$85", category: "Food", status: "Approved" }
-];
+const CATEGORY_COLORS: Record<string, string> = {
+  Travel: "#3ba8ff",
+  Food: "#38d788",
+  Lodging: "#ffa94d",
+  Transportation: "#ff6b9d",
+  Entertainment: "#c084fc",
+  Utilities: "#51cf66",
+  "Office Supplies": "#a78bfa",
+  Miscellaneous: "#f472b6"
+};
 
 const statBadges: Record<string, string> = {
   Approved: "badge green",
@@ -37,27 +35,81 @@ const statBadges: Record<string, string> = {
 };
 
 export default function AdminOverview() {
+  const [spendingByCategory, setSpendingByCategory] = useState<any[]>([]);
+  const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [flaggedCount, setFlaggedCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = "http://localhost:5000";
+
+  useEffect(() => {
+    fetchExpensesData();
+  }, []);
+
+  const fetchExpensesData = async () => {
+    try {
+      const statsRes = await fetch(`${API_URL}/expenses/stats`);
+      const statsData = await statsRes.json();
+
+      if (statsData.success) {
+        const percentages = statsData.category_percentages;
+        const chartData = Object.entries(percentages).map(([category, percentage]: [string, any]) => ({
+          name: category,
+          value: parseInt(percentage),
+          color: CATEGORY_COLORS[category] || "#999999"
+        }));
+        setSpendingByCategory(chartData);
+        setTotalExpenses(statsData.total_amount);
+      }
+
+      const expensesRes = await fetch(`${API_URL}/expenses`);
+      const expensesData = await expensesRes.json();
+
+      if (expensesData.success && expensesData.expenses) {
+        const formattedExpenses = expensesData.expenses
+          .slice(0, 5)
+          .map((exp: any) => ({
+            date: new Date(exp.uploadedAt).toISOString().split('T')[0],
+            vendor: exp.vendor || "Unknown",
+            amount: `$${exp.total?.toFixed(2) || "0.00"}`,
+            category: exp.category,
+            status: exp.status === "Processed" ? "Approved" : exp.status
+          }));
+        setRecentExpenses(formattedExpenses);
+        setPendingCount(expensesData.expenses.filter((e: any) => e.status === "Needs Review").length);
+        setFlaggedCount(expensesData.expenses.filter((e: any) => e.status === "Flagged").length);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="grid cols-4">
         <div className="stat-card">
           <div className="stat-label">My Total Expenses</div>
-          <div className="stat-value">$728</div>
-          <div className="stat-label">This month</div>
+          <div className="stat-value">${totalExpenses.toFixed(0)}</div>
+          <div className="stat-label">Total amount</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Receipts Uploaded</div>
-          <div className="stat-value">5</div>
+          <div className="stat-value">{recentExpenses.length}</div>
           <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card accent-yellow">
           <div className="stat-label">Pending Review</div>
-          <div className="stat-value">1</div>
+          <div className="stat-value">{pendingCount}</div>
           <div className="stat-label">Awaiting approval</div>
         </div>
         <div className="stat-card accent-red">
           <div className="stat-label">Flagged Items</div>
-          <div className="stat-value">1</div>
+          <div className="stat-value">{flaggedCount}</div>
           <div className="stat-label">Needs attention</div>
         </div>
       </div>
