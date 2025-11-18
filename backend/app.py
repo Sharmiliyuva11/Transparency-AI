@@ -161,34 +161,124 @@ recent_uploads = deque(maxlen=RECENT_UPLOAD_LIMIT)
 # Helper Functions
 # ------------------------
 def extract_amount(text: str) -> float:
+    """Extract the total amount from receipt text using multiple strategies."""
+
+    # Convert to uppercase for easier matching
+    text_upper = text.upper()
+
+    # Look for lines containing total amounts
+    lines = text_upper.split('\n')
+
+    # Strategy 1: Look for lines with "TOTAL" and extract the amount
+    total_patterns = [
+        r'TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
+        r'AMOUNT DUE[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
+        r'GRAND TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
+        r'FINAL TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
+        r'BALANCE DUE[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)'
+    ]
+
+    for pattern in total_patterns:
+        matches = re.findall(pattern, text_upper)
+        if matches:
+            # Clean the amount (remove commas) and convert to float
+            amount_str = matches[0].replace(',', '')
+            try:
+                return float(amount_str)
+            except ValueError:
+                continue
+
+    # Strategy 2: Find all monetary amounts and return the largest one
+    # More comprehensive regex for amounts
+    amount_pattern = r'\$?(\d+(?:,\d{3})*(?:\.\d{1,2})?)'
+    all_amounts = re.findall(amount_pattern, text)
+
+    if all_amounts:
+        # Convert to floats, filter out obviously wrong amounts (like years, phone numbers, etc.)
+        valid_amounts = []
+        for amt_str in all_amounts:
+            amt_str = amt_str.replace(',', '')
+            try:
+                amt = float(amt_str)
+                # Filter: amounts should be reasonable (not too large, not zero, not obviously wrong)
+                if 0.01 <= amt <= 10000.0:  # Reasonable range for receipts
+                    valid_amounts.append(amt)
+            except ValueError:
+                continue
+
+        if valid_amounts:
+            # Return the largest amount (usually the total)
+            return max(valid_amounts)
+
+    # Strategy 3: Fallback to original simple regex
     amounts = re.findall(r"\$?\s*(\d+\.?\d*)", text)
     if amounts:
         try:
-            return float(amounts[0])
+            # Clean and convert
+            amount_str = amounts[0].replace(',', '').strip()
+            return float(amount_str)
         except ValueError:
-            return 0.0
+            pass
+
     return 0.0
 
 
 def extract_entities(text: str) -> Dict:
-    if ner_pipeline is None:
-        return {"vendor": "", "date": "", "total": 0.0}
+    amount = extract_amount(text)
+    vendor = extract_vendor(text)
 
-    try:
-        entities = ner_pipeline(text[:512])
-        vendor = ""
+    return {"vendor": vendor, "date": "", "total": amount}
 
-        for entity in entities:
-            if entity["entity_group"] == "ORG":
-                vendor = entity["word"]
-                break
 
-        amount = extract_amount(text)
+def extract_vendor(text: str) -> str:
+    """Extract vendor name from receipt text using multiple heuristics."""
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
 
-        return {"vendor": vendor, "date": "", "total": amount}
+    # Remove empty lines and very short lines
+    lines = [line for line in lines if len(line) > 2]
 
-    except Exception:
-        return {"vendor": "", "date": "", "total": extract_amount(text)}
+    if not lines:
+        return ""
+
+    # Try NER first if available
+    if ner_pipeline is not None:
+        try:
+            entities = ner_pipeline(text[:512])
+            for entity in entities:
+                if entity["entity_group"] == "ORG":
+                    vendor_name = entity["word"].strip()
+                    if len(vendor_name) > 2:  # Filter out very short names
+                        return vendor_name
+        except Exception:
+            pass
+
+    # Fallback heuristics for vendor extraction
+    potential_vendors = []
+
+    # Look for lines that are likely business names (all caps, title case, etc.)
+    for i, line in enumerate(lines[:10]):  # Check first 10 lines
+        line = line.strip()
+
+        # Skip common receipt headers/footers
+        skip_words = ['RECEIPT', 'INVOICE', 'CASH', 'CHANGE', 'TOTAL', 'SUBTOTAL', 'TAX', 'DATE', 'TIME', 'THANK YOU', 'CUSTOMER', 'SALESPERSON']
+        if any(skip_word in line.upper() for skip_word in skip_words):
+            continue
+
+        # Look for lines that look like business names
+        if (line.isupper() and len(line) > 3 and len(line) < 50) or \
+           (line.istitle() and len(line) > 3 and len(line) < 50) or \
+           (any(char.isupper() for char in line) and len(line) > 3 and len(line) < 50):
+            # Clean up the line
+            cleaned = re.sub(r'[^\w\s&\-\.]', '', line).strip()
+            if cleaned and len(cleaned) > 2:
+                potential_vendors.append(cleaned)
+
+    # Return the first potential vendor found
+    if potential_vendors:
+        return potential_vendors[0]
+
+    # Last resort: return first non-empty line
+    return lines[0] if lines else ""
 
 
 # ------------------------

@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import {
   FiActivity,
@@ -22,27 +23,7 @@ import {
   Tooltip,
   XAxis
 } from "recharts";
-
-const spendingByCategory = [
-  { name: "Travel", value: 62, color: "#3ba8ff" },
-  { name: "Food", value: 14, color: "#38d788" },
-  { name: "Office", value: 24, color: "#ffa94d" }
-];
-
-const monthlyTrend = [
-  { month: "Jul", value: 520 },
-  { month: "Aug", value: 640 },
-  { month: "Sep", value: 580 },
-  { month: "Oct", value: 720 }
-];
-
-const recentExpenses = [
-  { date: "2025-11-01", vendor: "Coffee Shop", amount: "$45", category: "Food", status: "Approved" },
-  { date: "2025-10-30", vendor: "Uber", amount: "$28", category: "Travel", status: "Approved" },
-  { date: "2025-10-28", vendor: "Office Depot", amount: "$120", category: "Office", status: "Pending" },
-  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$450", category: "Travel", status: "Flagged" },
-  { date: "2025-10-22", vendor: "Restaurant", amount: "$85", category: "Food", status: "Approved" }
-];
+import { apiService, Expense, ExpenseStats } from "../services/api";
 
 const statBadges: Record<string, string> = {
   Approved: "badge green",
@@ -51,6 +32,49 @@ const statBadges: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [stats, setStats] = useState<ExpenseStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const [expensesData, statsData] = await Promise.all([
+          apiService.getExpenses(),
+          apiService.getExpenseStats()
+        ]);
+
+        if (expensesData.success) {
+          setExpenses(expensesData.expenses);
+        }
+        if (statsData.success) {
+          setStats(statsData);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Prepare data for charts
+  const spendingByCategory = stats ? Object.entries(stats.category_percentages).map(([name, value], index) => {
+    const colors = ["#3ba8ff", "#38d788", "#ffa94d", "#ff6b6b", "#a855f7"];
+    return { name, value, color: colors[index % colors.length] };
+  }) : [];
+
+  const monthlyTrend = [
+    { month: "Jul", value: 520 },
+    { month: "Aug", value: 640 },
+    { month: "Sep", value: 580 },
+    { month: "Oct", value: 720 }
+  ];
+
   return (
     <DashboardLayout
       appName="AI Expense Transparency"
@@ -74,23 +98,31 @@ export default function AdminDashboard() {
     >
       <div className="grid cols-4">
         <div className="stat-card">
-          <div className="stat-label">My Total Expenses</div>
-          <div className="stat-value">$728</div>
-          <div className="stat-label">This month</div>
+          <div className="stat-label">Total Expenses</div>
+          <div className="stat-value">
+            {loading ? '...' : stats ? `$${stats.total_amount.toFixed(2)}` : '$0.00'}
+          </div>
+          <div className="stat-label">All time</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Receipts Uploaded</div>
-          <div className="stat-value">5</div>
+          <div className="stat-value">
+            {loading ? '...' : stats ? stats.total_expenses : 0}
+          </div>
           <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card accent-yellow">
           <div className="stat-label">Pending Review</div>
-          <div className="stat-value">1</div>
+          <div className="stat-value">
+            {loading ? '...' : expenses.filter(e => e.status === 'Needs Review').length}
+          </div>
           <div className="stat-label">Awaiting approval</div>
         </div>
         <div className="stat-card accent-red">
           <div className="stat-label">Flagged Items</div>
-          <div className="stat-value">1</div>
+          <div className="stat-value">
+            {loading ? '...' : expenses.filter(e => e.status === 'Flagged').length}
+          </div>
           <div className="stat-label">Needs attention</div>
         </div>
       </div>
@@ -160,28 +192,38 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {recentExpenses.map((expense) => (
-              <tr key={expense.vendor + expense.date}>
-                <td>{expense.date}</td>
-                <td>{expense.vendor}</td>
-                <td>{expense.amount}</td>
-                <td>
-                  <span className="badge blue">{expense.category}</span>
-                </td>
-                <td>
-                  <span className={statBadges[expense.status]}>{expense.status}</span>
-                </td>
-                <td>
-                  <a className="secondary-link" href="#">
-                    View
-                  </a>{" "}
-                  ·
-                  <a className="secondary-link" href="#">
-                    Edit
-                  </a>
-                </td>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center">Loading...</td>
               </tr>
-            ))}
+            ) : expenses.length > 0 ? (
+              expenses.slice(0, 5).map((expense) => (
+                <tr key={expense.id}>
+                  <td>{new Date(expense.uploadedAt).toLocaleDateString()}</td>
+                  <td>{expense.vendor || 'Unknown Vendor'}</td>
+                  <td>${expense.total.toFixed(2)}</td>
+                  <td>
+                    <span className="badge blue">{expense.category}</span>
+                  </td>
+                  <td>
+                    <span className={statBadges[expense.status] || 'badge gray'}>{expense.status}</span>
+                  </td>
+                  <td>
+                    <a className="secondary-link" href="#">
+                      View
+                    </a>{" "}
+                    ·
+                    <a className="secondary-link" href="#">
+                      Edit
+                    </a>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="text-center">No expenses found</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
