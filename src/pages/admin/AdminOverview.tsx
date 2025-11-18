@@ -25,7 +25,15 @@ const CATEGORY_COLORS: Record<string, string> = {
   Entertainment: "#c084fc",
   Utilities: "#51cf66",
   "Office Supplies": "#a78bfa",
-  Miscellaneous: "#f472b6"
+  Miscellaneous: "#f472b6",
+  Pharmacy: "#ff6b35",
+  Telecommunications: "#8b5cf6",
+  Healthcare: "#06b6d4",
+  Technology: "#10b981",
+  Education: "#f59e0b",
+  Finance: "#ef4444",
+  Retail: "#ec4899",
+  Services: "#6366f1"
 };
 
 const statBadges: Record<string, string> = {

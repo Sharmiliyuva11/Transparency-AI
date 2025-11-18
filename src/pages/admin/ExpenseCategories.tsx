@@ -20,26 +20,42 @@ const CATEGORY_ICONS: Record<string, JSX.Element> = {
   Travel: <FaPlane />,
   Utilities: <FiPackage />,
   Entertainment: <FiCoffee />,
-  Miscellaneous: <FiDollarSign />
+  Miscellaneous: <FiDollarSign />,
+  Pharmacy: <FiPackage />,
+  Telecommunications: <FiTrendingUp />,
+  Healthcare: <FiPackage />,
+  Technology: <FiTrendingUp />,
+  Education: <FiPackage />,
+  Finance: <FiDollarSign />,
+  Retail: <FiPackage />,
+  Services: <FiTrendingUp />
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Food: "#3ba8ff",
-  Travel: "#38d788",
-  Utilities: "#ffa94d",
-  Entertainment: "#ff6b9d",
-  Miscellaneous: "#c084fc",
-  Lodging: "#51cf66",
-  Transportation: "#a78bfa",
-  "Office Supplies": "#f472b6"
+  Travel: "#3ba8ff",
+  Food: "#38d788",
+  Lodging: "#ffa94d",
+  Transportation: "#ff6b9d",
+  Entertainment: "#c084fc",
+  Utilities: "#51cf66",
+  "Office Supplies": "#a78bfa",
+  Miscellaneous: "#f472b6",
+  Pharmacy: "#ff6b35",
+  Telecommunications: "#8b5cf6",
+  Healthcare: "#06b6d4",
+  Technology: "#10b981",
+  Education: "#f59e0b",
+  Finance: "#ef4444",
+  Retail: "#ec4899",
+  Services: "#6366f1"
 };
 
-const lineChartData = [
-  { month: "Jul", Food: 10500, Utilities: 2600, Office: 1800, Travel: 3200 },
-  { month: "Aug", Food: 10800, Utilities: 2700, Office: 1900, Travel: 3300 },
-  { month: "Sep", Food: 11000, Utilities: 2750, Office: 2000, Travel: 3400 },
-  { month: "Oct", Food: 11200, Utilities: 2800, Office: 2100, Travel: 3450 }
-];
+// const lineChartData = [
+//   { month: "Jul", Food: 10500, Utilities: 2600, Office: 1800, Travel: 3200 },
+//   { month: "Aug", Food: 10800, Utilities: 2700, Office: 1900, Travel: 3300 },
+//   { month: "Sep", Food: 11000, Utilities: 2750, Office: 2000, Travel: 3400 },
+//   { month: "Oct", Food: 11200, Utilities: 2800, Office: 2100, Travel: 3450 }
+// ];
 
 const statusBadges: Record<string, string> = {
   Approved: "badge green",
@@ -51,12 +67,14 @@ export default function ExpenseCategories() {
   const [categoryData, setCategoryData] = useState<any[]>([]);
   const [barChartData, setBarChartData] = useState<any[]>([]);
   const [detailedExpenses, setDetailedExpenses] = useState<any[]>([]);
+  const [lineChartData, setLineChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const API_URL = "http://localhost:5000";
 
   useEffect(() => {
     fetchCategoryData();
+    fetchMonthlyTrends();
   }, []);
 
   const fetchCategoryData = async () => {
@@ -103,6 +121,19 @@ export default function ExpenseCategories() {
     } catch (err) {
       console.error("Error fetching category data:", err);
       setLoading(false);
+    }
+  };
+
+  const fetchMonthlyTrends = async () => {
+    try {
+      const res = await fetch(`${API_URL}/expenses/trends`);
+      const data = await res.json();
+
+      if (data.success && data.trends) {
+        setLineChartData(data.trends);
+      }
+    } catch (err) {
+      console.error("Error fetching monthly trends:", err);
     }
   };
 
@@ -177,12 +208,12 @@ export default function ExpenseCategories() {
                   axisLine={false}
                   style={{ fontSize: "13px" }}
                 />
-                <YAxis 
-                  stroke="#5870a5" 
-                  tickLine={false} 
+                <YAxis
+                  stroke="#5870a5"
+                  tickLine={false}
                   axisLine={false}
                   style={{ fontSize: "13px" }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
                 />
                 <Tooltip
                   cursor={{ fill: "rgba(59, 168, 255, 0.08)" }}
@@ -218,76 +249,55 @@ export default function ExpenseCategories() {
           <div style={{ width: "100%", height: 300 }}>
             <ResponsiveContainer>
               <LineChart data={lineChartData}>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="rgba(99, 125, 190, 0.15)" 
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(99, 125, 190, 0.15)"
                   vertical={false}
                 />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#5870a5" 
-                  dy={6} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="month"
+                  stroke="#5870a5"
+                  dy={6}
+                  tickLine={false}
                   axisLine={false}
                   style={{ fontSize: "13px" }}
                 />
-                <YAxis 
-                  stroke="#5870a5" 
-                  tickLine={false} 
+                <YAxis
+                  stroke="#5870a5"
+                  tickLine={false}
                   axisLine={false}
                   style={{ fontSize: "13px" }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
                 />
                 <Tooltip
                   cursor={{ stroke: "#3ba8ff", strokeWidth: 1 }}
-                  contentStyle={{ 
-                    background: "#0c1736", 
-                    borderRadius: 12, 
-                    border: "1px solid rgba(71, 102, 190, 0.45)" 
+                  contentStyle={{
+                    background: "#0c1736",
+                    borderRadius: 12,
+                    border: "1px solid rgba(71, 102, 190, 0.45)"
                   }}
                   labelStyle={{ color: "#99a5cc" }}
                   itemStyle={{ color: "#e6ecff" }}
                   formatter={(value: number) => `$${value.toLocaleString()}`}
                 />
-                <Legend 
+                <Legend
                   wrapperStyle={{ paddingTop: "20px" }}
                   iconType="circle"
                   formatter={(value) => (
                     <span style={{ color: "#99a5cc", fontSize: "13px" }}>{value}</span>
                   )}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="Food" 
-                  stroke="#3ba8ff" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 4, fill: "#3ba8ff" }}
-                  activeDot={{ r: 6 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Utilities" 
-                  stroke="#ffa94d" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 4, fill: "#ffa94d" }}
-                  activeDot={{ r: 6 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Office" 
-                  stroke="#ff6b9d" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 4, fill: "#ff6b9d" }}
-                  activeDot={{ r: 6 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Travel" 
-                  stroke="#38d788" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 4, fill: "#38d788" }}
-                  activeDot={{ r: 6 }}
-                />
+                {categoryData.map((category, index) => (
+                  <Line
+                    key={category.name}
+                    type="monotone"
+                    dataKey={category.name}
+                    stroke={category.color}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: category.color }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
