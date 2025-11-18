@@ -2,11 +2,13 @@ from collections import deque
 from datetime import datetime
 import os
 import re
-from typing import Dict, List
+from typing import Dict
+from uuid import uuid4
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
 from transformers import pipeline
 
 from utils.ocr import extract_text_from_image
@@ -20,13 +22,32 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-UPLOAD_FOLDER = 'uploads'
-FINAL_CATEGORY_LIST = load_categories()
-RECENT_UPLOAD_LIMIT = 25
+# ------------------------
+# File Serving Route FIXED
+# ------------------------
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+@app.route('/uploads/<path:filename>', methods=['GET'])
+def serve_uploads(filename):
+    """Serve uploaded files properly"""
+    try:
+        return send_from_directory('uploads', filename)
+    except Exception:
+        return jsonify({"error": "File not found"}), 404
 
-# Database model
+
+UPLOAD_FOLDER = "uploads"
+LOGO_FOLDER = os.path.join(UPLOAD_FOLDER, "logos")
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_LOGO_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# ------------------------
+# Database Models
+# ------------------------
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255))
@@ -35,37 +56,112 @@ class Expense(db.Model):
     vendor = db.Column(db.String(255))
     amount = db.Column(db.Float)
     text_preview = db.Column(db.Text)
-    status = db.Column(db.String(50), default='Processed')
+    status = db.Column(db.String(50), default="Processed")
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'file': self.filename,
-            'uploadedAt': self.uploaded_at.isoformat() + 'Z',
-            'category': self.category,
-            'vendor': self.vendor,
-            'total': self.amount,
-            'textPreview': self.text_preview,
-            'status': self.status
+            "id": self.id,
+            "file": self.filename,
+            "uploadedAt": self.uploaded_at.isoformat() + "Z",
+            "category": self.category,
+            "vendor": self.vendor,
+            "total": self.amount,
+            "textPreview": self.text_preview,
+            "status": self.status
         }
 
+
+class UserSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(50), nullable=False)
+    user_id = db.Column(db.String(100), default="default")
+
+    display_name = db.Column(db.String(255))
+    email = db.Column(db.String(255))
+
+    organization_name = db.Column(db.String(255))
+    industry = db.Column(db.String(100))
+    logo_path = db.Column(db.String(255))
+
+    contact_info = db.Column(db.Text)
+    help_content = db.Column(db.Text)
+
+    ai_enabled = db.Column(db.Boolean, default=True)
+    ai_response_tone = db.Column(db.String(50), default="professional")
+    ai_accuracy_threshold = db.Column(db.Integer, default=95)
+
+    email_notifications = db.Column(db.Boolean, default=True)
+    push_notifications = db.Column(db.Boolean, default=True)
+    expense_alerts = db.Column(db.Boolean, default=True)
+    weekly_reports = db.Column(db.Boolean, default=True)
+
+    theme = db.Column(db.String(20), default="dark")
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "role": self.role,
+            "userId": self.user_id,
+            "profile": {
+                "displayName": self.display_name,
+                "email": self.email
+            },
+            "organisation": {
+                "name": self.organization_name,
+                "industry": self.industry,
+                "logoPath": self.logo_path
+            },
+            "contact": {
+                "info": self.contact_info
+            },
+            "help": {
+                "content": self.help_content
+            },
+            "ai": {
+                "enabled": self.ai_enabled,
+                "responseTone": self.ai_response_tone,
+                "accuracyThreshold": self.ai_accuracy_threshold
+            },
+            "notifications": {
+                "email": self.email_notifications,
+                "push": self.push_notifications,
+                "expenseAlerts": self.expense_alerts,
+                "weeklyReports": self.weekly_reports
+            },
+            "preferences": {
+                "theme": self.theme
+            },
+            "createdAt": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() + "Z" if self.updated_at else None
+        }
+
+
+# ------------------------
+# Load NLP Models
+# ------------------------
 try:
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
-except Exception as ner_error:
+except Exception:
     ner_pipeline = None
-    print("NER pipeline unavailable:", ner_error)
 
 try:
     sentiment_pipeline = pipeline("sentiment-analysis")
-except Exception as sentiment_error:
+except Exception:
     sentiment_pipeline = None
-    print("Sentiment pipeline unavailable:", sentiment_error)
 
+# Limit recent uploads
+RECENT_UPLOAD_LIMIT = 20
 recent_uploads = deque(maxlen=RECENT_UPLOAD_LIMIT)
 
 
+# ------------------------
+# Helper Functions
+# ------------------------
 def extract_amount(text: str) -> float:
-    amounts = re.findall(r'\$?\s*(\d+\.?\d*)', text)
+    amounts = re.findall(r"\$?\s*(\d+\.?\d*)", text)
     if amounts:
         try:
             return float(amounts[0])
@@ -77,35 +173,41 @@ def extract_amount(text: str) -> float:
 def extract_entities(text: str) -> Dict:
     if ner_pipeline is None:
         return {"vendor": "", "date": "", "total": 0.0}
-    
+
     try:
         entities = ner_pipeline(text[:512])
         vendor = ""
+
         for entity in entities:
-            if entity['entity_group'] == 'ORG':
-                vendor = entity['word']
+            if entity["entity_group"] == "ORG":
+                vendor = entity["word"]
                 break
-        
+
         amount = extract_amount(text)
+
         return {"vendor": vendor, "date": "", "total": amount}
-    except Exception as e:
-        print(f"Entity extraction error: {e}")
+
+    except Exception:
         return {"vendor": "", "date": "", "total": extract_amount(text)}
 
 
-@app.route('/')
+# ------------------------
+# Routes
+# ------------------------
+@app.route("/")
 def home():
-    return jsonify({'status': 'success', 'message': '✅ The Transparency-AI OCR backend is running successfully!'})
+    return jsonify({"status": "success", "message": "Transparency-AI backend running"})
 
 
-@app.route('/ocr', methods=['POST'])
+@app.route("/ocr", methods=["POST"])
 def ocr():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
 
     filepath = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(filepath)
@@ -115,168 +217,253 @@ def ocr():
         category = classify_text(text)
         entities = extract_entities(text)
 
-        # Save to database
         expense = Expense(
             filename=file.filename,
             category=category,
-            vendor=entities['vendor'],
-            amount=entities['total'],
+            vendor=entities["vendor"],
+            amount=entities["total"],
             text_preview=text[:200],
-            status='Processed' if text else 'Needs Review'
+            status="Processed" if text else "Needs Review"
         )
+
         db.session.add(expense)
         db.session.commit()
 
-        entry = expense.to_dict()
-        recent_uploads.appendleft(entry)
+        recent_uploads.appendleft(expense.to_dict())
+
         os.remove(filepath)
 
         return jsonify({
-            'success': True,
-            'text': text,
-            'classification': {'label': category, 'score': 0.0},
-            'entities': entities
+            "success": True,
+            "text": text,
+            "classification": {"label": category, "score": 0.0},
+            "entities": entities
         })
+
     except Exception as error:
         if os.path.exists(filepath):
             os.remove(filepath)
-        return jsonify({'error': str(error)}), 500
+        return jsonify({"error": str(error)}), 500
 
 
-@app.route('/analyze', methods=['POST'])
+@app.route("/analyze", methods=["POST"])
 def analyze():
     data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({'error': 'No text provided'}), 400
-    
-    text = data['text']
+
+    if not data or "text" not in data:
+        return jsonify({"error": "No text provided"}), 400
+
+    text = data["text"]
+
     try:
         category = classify_text(text)
         entities = extract_entities(text)
 
-        response = {
-            'success': True,
-            'text': text,
-            'classification': {'label': category, 'score': 0.0},
-            'entities': entities,
-            'length': len(text)
-        }
-
-        return jsonify(response)
-    except Exception as error:
-        return jsonify({'error': str(error)}), 500
-
-
-@app.route('/classify', methods=['POST'])
-def classify():
-    data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({'error': 'No text provided'}), 400
-
-    text = data['text']
-    try:
-        predicted_category = classify_text(text)
         return jsonify({
-            'predicted_category': predicted_category,
-            'all_categories': FINAL_CATEGORY_LIST
+            "success": True,
+            "text": text,
+            "classification": {"label": category, "score": 0.0},
+            "entities": entities,
+            "length": len(text)
         })
+
     except Exception as error:
-        return jsonify({'error': str(error)}), 500
+        return jsonify({"error": str(error)}), 500
 
 
-@app.route('/entities', methods=['POST'])
-def entities():
-    data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({'error': 'No text provided'}), 400
-    
-    text = data['text']
-    try:
-        entities_result = extract_entities(text)
-        return jsonify({'success': True, 'entities': entities_result})
-    except Exception as error:
-        return jsonify({'error': str(error)}), 500
+@app.route("/recent-uploads", methods=["GET"])
+def recent_uploads_api():
+    return jsonify({"success": True, "uploads": list(recent_uploads)})
 
 
-@app.route('/recent-uploads', methods=['GET'])
-def get_recent_uploads():
-    return jsonify({
-        'success': True,
-        'uploads': list(recent_uploads),
-        'count': len(recent_uploads)
-    })
-
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({
-        'status': 'healthy',
-        'ocr': 'available',
-        'classifier': 'available',
-        'ner': 'available' if ner_pipeline else 'unavailable',
-        'sentiment': 'available' if sentiment_pipeline else 'unavailable'
-    })
-
-
-@app.route('/expenses', methods=['GET'])
+@app.route("/expenses", methods=["GET"])
 def get_expenses():
     expenses = Expense.query.all()
     return jsonify({
-        'success': True,
-        'expenses': [e.to_dict() for e in expenses],
-        'count': len(expenses)
+        "success": True,
+        "expenses": [e.to_dict() for e in expenses],
+        "count": len(expenses)
     })
 
 
-@app.route('/expenses/by-category', methods=['GET'])
-def get_expenses_by_category():
-    expenses = Expense.query.all()
-    category_data = {}
+# ------------------------
+# Settings (GET & PUT)
+# ------------------------
+@app.route("/settings/<role>", methods=["GET"])
+def get_settings(role):
+    if role not in ["admin", "auditor", "employee"]:
+        return jsonify({"error": "Invalid role"}), 400
 
-    for expense in expenses:
-        category = expense.category or 'Uncategorized'
-        if category not in category_data:
-            category_data[category] = {
-                'total': 0,
-                'count': 0,
-                'expenses': []
-            }
-        category_data[category]['total'] += expense.amount or 0
-        category_data[category]['count'] += 1
-        category_data[category]['expenses'].append(expense.to_dict())
+    settings = UserSettings.query.filter_by(role=role).first()
 
-    return jsonify({
-        'success': True,
-        'by_category': category_data
-    })
+    if not settings:
+        settings = UserSettings(
+            role=role,
+            display_name=f"{role.title()} User",
+            email=f"{role}@example.com"
+        )
+        if role == "admin":
+            settings.organization_name = "Default Organization"
+            settings.industry = "technology"
 
+        db.session.add(settings)
+        db.session.commit()
 
-@app.route('/expenses/stats', methods=['GET'])
-def get_expenses_stats():
-    expenses = Expense.query.all()
-    total_amount = sum(e.amount or 0 for e in expenses)
-    category_totals = {}
-
-    for expense in expenses:
-        category = expense.category or 'Uncategorized'
-        category_totals[category] = category_totals.get(category, 0) + (expense.amount or 0)
-
-    category_percentages = {}
-    for cat, amount in category_totals.items():
-        category_percentages[cat] = round((amount / total_amount * 100) if total_amount > 0 else 0, 2)
-
-    stats = {
-        'success': True,
-        'total_expenses': len(expenses),
-        'total_amount': round(total_amount, 2),
-        'by_category': category_totals,
-        'category_percentages': category_percentages
-    }
-
-    return jsonify(stats)
+    return jsonify({"success": True, "settings": settings.to_dict()})
 
 
+@app.route("/settings/<role>", methods=["PUT"])
+def update_settings(role):
+    if role not in ["admin", "auditor", "employee"]:
+        return jsonify({"error": "Invalid role"}), 400
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    try:
+        settings = UserSettings.query.filter_by(role=role).first()
+
+        if not settings:
+            settings = UserSettings(role=role)
+            db.session.add(settings)
+
+        # PROFILE
+        if "profile" in data:
+            p = data["profile"]
+            settings.display_name = p.get("displayName", settings.display_name)
+            settings.email = p.get("email", settings.email)
+
+        # ORG SETTINGS ADMIN ONLY
+        if role == "admin" and "organisation" in data:
+            org = data["organisation"]
+            settings.organization_name = org.get("name", settings.organization_name)
+            settings.industry = org.get("industry", settings.industry)
+
+        # AI SETTINGS
+        if "ai" in data:
+            ai = data["ai"]
+            settings.ai_enabled = ai.get("enabled", settings.ai_enabled)
+            settings.ai_response_tone = ai.get("responseTone", settings.ai_response_tone)
+            settings.ai_accuracy_threshold = ai.get("accuracyThreshold", settings.ai_accuracy_threshold)
+
+        # NOTIFICATION SETTINGS
+        if "notifications" in data:
+            n = data["notifications"]
+            settings.email_notifications = n.get("email", settings.email_notifications)
+            settings.push_notifications = n.get("push", settings.push_notifications)
+            settings.expense_alerts = n.get("expenseAlerts", settings.expense_alerts)
+            settings.weekly_reports = n.get("weeklyReports", settings.weekly_reports)
+
+        # PREFERENCES
+        if "preferences" in data:
+            pref = data["preferences"]
+            settings.theme = pref.get("theme", settings.theme)
+
+        # CONTACT INFO ADMIN ONLY
+        if role == "admin" and "contact" in data:
+            settings.contact_info = data["contact"].get("info", settings.contact_info)
+
+        # HELP CONTENT ADMIN ONLY
+        if role == "admin" and "help" in data:
+            settings.help_content = data["help"].get("content", settings.help_content)
+
+        db.session.commit()
+
+        return jsonify({"success": True, "settings": settings.to_dict()})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to update settings: {str(e)}"}), 500
+
+
+# ------------------------
+# Logo Upload
+# ------------------------
+@app.route("/settings/<role>/upload-logo", methods=["POST"])
+def upload_logo(role):
+    try:
+        if role != "admin":
+            return jsonify({"error": "Only admins can upload logos"}), 403
+
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+
+        file = request.files["file"]
+
+        if file.filename == "":
+            return jsonify({"error": "No file selected"}), 400
+
+        if not allowed_file(file.filename):
+            return jsonify({"error": "Invalid file format"}), 400
+
+        size = len(file.read())
+        if size > MAX_LOGO_SIZE:
+            file.seek(0)
+            return jsonify({"error": "File too large (max 5MB)"}), 400
+
+        file.seek(0)
+
+        settings = UserSettings.query.filter_by(role=role).first()
+        if not settings:
+            settings = UserSettings(role=role)
+            db.session.add(settings)
+
+        filename = f"{uuid4()}_{secure_filename(file.filename)}"
+        filepath = os.path.join(LOGO_FOLDER, filename)
+        file.save(filepath)
+
+        settings.logo_path = f"uploads/logos/{filename}"
+        db.session.commit()
+
+        return jsonify({"success": True, "logoPath": settings.logo_path})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ------------------------
+# DB Migration
+# ------------------------
+def migrate_database():
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        cols = [c["name"] for c in inspector.get_columns("user_settings")]
+
+        needed = False
+
+        if "logo_path" not in cols:
+            db.session.execute(text("ALTER TABLE user_settings ADD COLUMN logo_path VARCHAR(255)"))
+            needed = True
+
+        if "contact_info" not in cols:
+            db.session.execute(text("ALTER TABLE user_settings ADD COLUMN contact_info TEXT"))
+            needed = True
+
+        if "help_content" not in cols:
+            db.session.execute(text("ALTER TABLE user_settings ADD COLUMN help_content TEXT"))
+            needed = True
+
+        if needed:
+            db.session.commit()
+
+    except Exception as e:
+        print("Migration skipped:", e)
+        db.session.rollback()
+
+
+# ------------------------
+# Run Backend
+# ------------------------
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        try:
+            migrate_database()
+        except:
+            pass
+
     app.run(host="127.0.0.1", port=5000, debug=True)
+
