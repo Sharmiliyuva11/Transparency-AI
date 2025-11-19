@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FiCamera, FiCloudLightning, FiX, FiCheck } from "react-icons/fi";
+import { useExpenseRefresh } from "../../context/ExpenseContext";
 
 const pipelineSteps = [
   { title: "OCR Extraction", description: "AI captures receipt text instantly" },
@@ -33,6 +34,7 @@ export default function Upload() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
+  const { triggerRefresh } = useExpenseRefresh();
 
   const API_URL = "http://localhost:5000";
 
@@ -77,6 +79,7 @@ export default function Upload() {
           fileName: file.name
         });
         await fetchRecentUploads();
+        triggerRefresh();
       } else {
         setError(data.error || "Upload failed");
       }

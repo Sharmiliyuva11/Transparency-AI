@@ -139,6 +139,34 @@ class UserSettings(db.Model):
         }
 
 
+class AnomalyDetection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expense.id'), nullable=False)
+    anomaly_type = db.Column(db.String(100), nullable=False)
+    severity = db.Column(db.String(20), nullable=False)
+    confidence = db.Column(db.Float, default=0.0)
+    description = db.Column(db.Text)
+    detected_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(50), default="Pending")
+
+    def to_dict(self):
+        expense = Expense.query.get(self.expense_id)
+        return {
+            "id": self.id,
+            "expenseId": self.expense_id,
+            "dateTime": expense.uploaded_at.isoformat() + "Z" if expense else None,
+            "vendorName": expense.vendor if expense else "",
+            "category": expense.category if expense else "",
+            "amount": expense.amount if expense else 0,
+            "anomalyType": self.anomaly_type,
+            "severity": self.severity,
+            "confidence": self.confidence,
+            "description": self.description,
+            "detectedAt": self.detected_at.isoformat() + "Z" if self.detected_at else None,
+            "status": self.status
+        }
+
+
 # ------------------------
 # Load NLP Models
 # ------------------------
@@ -281,6 +309,101 @@ def extract_vendor(text: str) -> str:
     return lines[0] if lines else ""
 
 
+def detect_anomalies(expense_id: int, amount: float, vendor: str, category: str, uploaded_at) -> list:
+    """Detect anomalies in the expense and create AnomalyDetection records"""
+    anomalies = []
+    
+    try:
+        all_expenses = Expense.query.all()
+        
+        if len(all_expenses) <= 1:
+            return anomalies
+        
+        similar_category_expenses = [e for e in all_expenses if e.category == category and e.id != expense_id]
+        
+        if similar_category_expenses:
+            amounts = [e.amount for e in similar_category_expenses if e.amount > 0]
+            
+            if amounts:
+                avg_amount = sum(amounts) / len(amounts)
+                max_amount = max(amounts)
+                min_amount = min(amounts)
+                std_dev = (sum((x - avg_amount) ** 2 for x in amounts) / len(amounts)) ** 0.5 if len(amounts) > 1 else 0
+                
+                if std_dev > 0:
+                    z_score = abs((amount - avg_amount) / std_dev)
+                else:
+                    z_score = abs(amount - avg_amount) / (avg_amount + 1)
+                
+                if z_score > 2:
+                    anomaly = AnomalyDetection(
+                        expense_id=expense_id,
+                        anomaly_type="Unusual Amount",
+                        severity="Critical" if z_score > 3 else "High" if z_score > 2.5 else "Medium",
+                        confidence=min(95, 50 + (z_score * 10)),
+                        description=f"Transaction amount ${amount:.2f} deviates significantly from category average ${avg_amount:.2f}",
+                        status="Pending"
+                    )
+                    anomalies.append(anomaly)
+                
+                if amount > (max_amount * 1.5):
+                    anomaly = AnomalyDetection(
+                        expense_id=expense_id,
+                        anomaly_type="Unusual Amount",
+                        severity="High",
+                        confidence=85,
+                        description=f"Transaction amount ${amount:.2f} exceeds typical spending pattern (max: ${max_amount:.2f})",
+                        status="Pending"
+                    )
+                    if not any(a.anomaly_type == "Unusual Amount" for a in anomalies):
+                        anomalies.append(anomaly)
+        
+        duplicate_expense = Expense.query.filter(
+            Expense.vendor == vendor,
+            Expense.amount == amount,
+            Expense.category == category,
+            Expense.id != expense_id,
+            Expense.uploaded_at >= (uploaded_at - db.func.cast(db.literal('1 day'), db.Interval))
+        ).first()
+        
+        if duplicate_expense:
+            anomaly = AnomalyDetection(
+                expense_id=expense_id,
+                anomaly_type="Duplicate Detection",
+                severity="High",
+                confidence=90,
+                description=f"Potential duplicate: Similar transaction found for {vendor} on {duplicate_expense.uploaded_at.strftime('%Y-%m-%d')}",
+                status="Pending"
+            )
+            anomalies.append(anomaly)
+        
+        known_vendors = set(e.vendor.lower() for e in all_expenses if e.vendor)
+        if vendor.lower() not in known_vendors and len(known_vendors) > 0:
+            vendor_count = len([e for e in all_expenses if e.vendor.lower() == vendor.lower()])
+            
+            if vendor_count == 1:
+                anomaly = AnomalyDetection(
+                    expense_id=expense_id,
+                    anomaly_type="Unknown Vendor",
+                    severity="Low",
+                    confidence=70,
+                    description=f"Vendor '{vendor}' not found in previous transaction history",
+                    status="Pending"
+                )
+                anomalies.append(anomaly)
+        
+        for anomaly in anomalies:
+            db.session.add(anomaly)
+        
+        if anomalies:
+            db.session.commit()
+    
+    except Exception as e:
+        print(f"Error detecting anomalies: {str(e)}")
+    
+    return anomalies
+
+
 # ------------------------
 # Routes
 # ------------------------
@@ -318,6 +441,8 @@ def ocr():
 
         db.session.add(expense)
         db.session.commit()
+
+        detect_anomalies(expense.id, entities["total"], entities["vendor"], category, expense.uploaded_at)
 
         recent_uploads.appendleft(expense.to_dict())
 
@@ -374,6 +499,28 @@ def get_expenses():
         "expenses": [e.to_dict() for e in expenses],
         "count": len(expenses)
     })
+
+
+@app.route("/expenses/non-anomalous", methods=["GET"])
+def get_non_anomalous_expenses():
+    try:
+        expenses = Expense.query.all()
+        anomalies = AnomalyDetection.query.all()
+        
+        anomalous_expense_ids = set(a.expense_id for a in anomalies)
+        
+        non_anomalous = [
+            e.to_dict() for e in expenses 
+            if e.id not in anomalous_expense_ids
+        ]
+        
+        return jsonify({
+            "success": True,
+            "expenses": non_anomalous,
+            "count": len(non_anomalous)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get non-anomalous expenses: {str(e)}"}), 500
 
 
 @app.route("/expenses/stats", methods=["GET"])
@@ -485,6 +632,89 @@ def get_monthly_trends():
 
     except Exception as e:
         return jsonify({"error": f"Failed to get monthly trends: {str(e)}"}), 500
+
+
+# ------------------------
+# Anomaly Detection
+# ------------------------
+@app.route("/anomalies", methods=["GET"])
+def get_anomalies():
+    try:
+        anomalies = AnomalyDetection.query.all()
+        return jsonify({
+            "success": True,
+            "anomalies": [a.to_dict() for a in anomalies],
+            "count": len(anomalies)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get anomalies: {str(e)}"}), 500
+
+
+@app.route("/anomalies/stats", methods=["GET"])
+def get_anomalies_stats():
+    try:
+        anomalies = AnomalyDetection.query.all()
+        
+        total_anomalies = len(anomalies)
+        severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+        anomaly_types = {}
+        
+        for anomaly in anomalies:
+            severity_counts[anomaly.severity] = severity_counts.get(anomaly.severity, 0) + 1
+            atype = anomaly.anomaly_type
+            anomaly_types[atype] = anomaly_types.get(atype, 0) + 1
+        
+        avg_confidence = sum(a.confidence for a in anomalies) / len(anomalies) if anomalies else 0
+        
+        expenses = Expense.query.all()
+        flagged_count = len(set(a.expense_id for a in anomalies))
+        
+        return jsonify({
+            "success": True,
+            "totalCharges": sum(e.amount for e in expenses),
+            "anomalousTransactions": total_anomalies,
+            "flaggedExpenses": flagged_count,
+            "detectionAccuracy": min(100, 70 + (avg_confidence * 0.3)),
+            "severityCounts": severity_counts,
+            "anomalyTypes": anomaly_types,
+            "averageConfidence": avg_confidence
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get anomaly stats: {str(e)}"}), 500
+
+
+@app.route("/anomalies/by-severity", methods=["GET"])
+def get_anomalies_by_severity():
+    try:
+        anomalies = AnomalyDetection.query.all()
+        by_severity = {"Critical": [], "High": [], "Medium": [], "Low": []}
+        
+        for anomaly in anomalies:
+            severity = anomaly.severity
+            if severity in by_severity:
+                by_severity[severity].append(anomaly.to_dict())
+        
+        return jsonify({
+            "success": True,
+            "by_severity": by_severity
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get anomalies by severity: {str(e)}"}), 500
+
+
+@app.route("/anomalies/recent", methods=["GET"])
+def get_recent_anomalies():
+    try:
+        limit = request.args.get("limit", 10, type=int)
+        anomalies = AnomalyDetection.query.order_by(AnomalyDetection.detected_at.desc()).limit(limit).all()
+        
+        return jsonify({
+            "success": True,
+            "anomalies": [a.to_dict() for a in anomalies],
+            "count": len(anomalies)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get recent anomalies: {str(e)}"}), 500
 
 
 # ------------------------

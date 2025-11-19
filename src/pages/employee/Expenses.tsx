@@ -1,16 +1,12 @@
-const expenses = [
-  { date: "2025-11-01", vendor: "Coffee Shop", amount: "$45", category: "Food", status: "Approved", aiFlag: "Clean" },
-  { date: "2025-10-30", vendor: "Uber", amount: "$28", category: "Travel", status: "Approved", aiFlag: "Clean" },
-  { date: "2025-10-28", vendor: "Office Depot", amount: "$120", category: "Office", status: "Pending", aiFlag: "Review" },
-  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$250", category: "Travel", status: "Approved", aiFlag: "Clean" },
-  { date: "2025-10-24", vendor: "Restaurant", amount: "$85", category: "Food", status: "Flagged", aiFlag: "Anomaly" },
-  { date: "2025-10-21", vendor: "Cloud Services", amount: "$320", category: "IT", status: "Approved", aiFlag: "Clean" }
-];
+import { useState, useEffect } from "react";
+import { useExpenseRefresh } from "../../context/ExpenseContext";
 
 const statusBadges: Record<string, string> = {
   Approved: "badge green",
   Pending: "badge yellow",
-  Flagged: "badge red"
+  Flagged: "badge red",
+  "Processed": "badge green",
+  "Needs Review": "badge yellow"
 };
 
 const aiBadges: Record<string, string> = {
@@ -19,24 +15,100 @@ const aiBadges: Record<string, string> = {
   Anomaly: "badge red"
 };
 
+interface Expense {
+  id: number;
+  file: string;
+  uploadedAt: string;
+  category: string;
+  vendor: string;
+  total: number;
+  textPreview: string;
+  status: string;
+}
+
 export default function Expenses() {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [stats, setStats] = useState({
+    totalExpenses: 0,
+    cleanExpenses: 0,
+    aiConfidence: 94.8
+  });
+  const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useExpenseRefresh();
+
+  const API_URL = "http://localhost:5000";
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [refreshTrigger]);
+
+  const fetchExpenses = async () => {
+    try {
+      const [expensesRes, anomaliesRes] = await Promise.all([
+        fetch(`${API_URL}/expenses`),
+        fetch(`${API_URL}/anomalies`)
+      ]);
+
+      const expensesData = await expensesRes.json();
+      const anomaliesData = await anomaliesRes.json();
+
+      if (expensesData.success) {
+        const allExpenses = expensesData.expenses || [];
+        const anomalies = anomaliesData.anomalies || [];
+        const anomalyExpenseIds = new Set(anomalies.map((a: any) => a.expenseId));
+
+        setExpenses(allExpenses);
+        setStats({
+          totalExpenses: allExpenses.length,
+          cleanExpenses: allExpenses.filter((e: Expense) => !anomalyExpenseIds.has(e.id)).length,
+          aiConfidence: 94.8
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD"
+    }).format(amount);
+  };
+
+  const getAIFlag = (status: string) => {
+    if (status === "Processed") return "Clean";
+    if (status === "Needs Review") return "Review";
+    return "Clean";
+  };
+
   return (
     <>
       <div className="grid cols-3">
         <div className="stat-card">
           <div className="stat-label">Total Expenses</div>
-          <div className="stat-value">$12,480</div>
-          <div className="stat-label">YTD spend</div>
+          <div className="stat-value">{stats.totalExpenses}</div>
+          <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card accent-yellow">
           <div className="stat-label">Awaiting Review</div>
-          <div className="stat-value">3</div>
+          <div className="stat-value">{expenses.filter(e => e.status === "Needs Review").length}</div>
           <div className="stat-label">Receipts needing action</div>
         </div>
         <div className="stat-card accent-green">
-          <div className="stat-label">AI Confidence</div>
-          <div className="stat-value">94.8%</div>
-          <div className="stat-label">Auto approvals under threshold</div>
+          <div className="stat-label">Clean Expenses</div>
+          <div className="stat-value">{stats.cleanExpenses}</div>
+          <div className="stat-label">Non-anomalous submissions</div>
         </div>
       </div>
       <div className="section-card">
@@ -62,31 +134,39 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {expenses.map((expense) => (
-              <tr key={expense.vendor + expense.date}>
-                <td>{expense.date}</td>
-                <td>{expense.vendor}</td>
-                <td>{expense.amount}</td>
-                <td>
-                  <span className="badge blue">{expense.category}</span>
-                </td>
-                <td>
-                  <span className={statusBadges[expense.status]}>{expense.status}</span>
-                </td>
-                <td>
-                  <span className={aiBadges[expense.aiFlag]}>{expense.aiFlag}</span>
-                </td>
-                <td>
-                  <a className="secondary-link" href="#">
-                    View
-                  </a>{" "}
-                  ·
-                  <a className="secondary-link" href="#">
-                    Export
-                  </a>
+            {expenses.length > 0 ? (
+              expenses.map((expense) => (
+                <tr key={expense.id}>
+                  <td>{formatDate(expense.uploadedAt)}</td>
+                  <td>{expense.vendor || "N/A"}</td>
+                  <td>{formatCurrency(expense.total || 0)}</td>
+                  <td>
+                    <span className="badge blue">{expense.category || "Other"}</span>
+                  </td>
+                  <td>
+                    <span className={statusBadges[expense.status] || "badge yellow"}>{expense.status}</span>
+                  </td>
+                  <td>
+                    <span className={aiBadges[getAIFlag(expense.status)]}>{getAIFlag(expense.status)}</span>
+                  </td>
+                  <td>
+                    <a className="secondary-link" href="#">
+                      View
+                    </a>{" "}
+                    ·
+                    <a className="secondary-link" href="#">
+                      Export
+                    </a>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", color: "#999" }}>
+                  No expenses submitted yet
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

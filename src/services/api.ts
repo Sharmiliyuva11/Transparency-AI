@@ -1,5 +1,24 @@
 const API_BASE_URL = 'http://127.0.0.1:5000';
 
+export interface Expense {
+  id: number;
+  file: string;
+  uploadedAt: string;
+  category: string;
+  vendor: string;
+  total: number;
+  textPreview: string;
+  status: string;
+}
+
+export interface ExpenseStats {
+  success: boolean;
+  total_expenses: number;
+  total_amount: number;
+  by_category: Record<string, number>;
+  category_percentages: Record<string, number>;
+}
+
 export interface UserSettings {
   id: number;
   role: string;
@@ -110,6 +129,14 @@ class ApiService {
 
   async updateHelp(role: string, helpContent: string): Promise<{ success: boolean; settings: UserSettings }> {
     return this.updateSettings(role, { help: { content: helpContent } });
+  }
+
+  async getExpenses(): Promise<{ success: boolean; expenses: Expense[] }> {
+    return this.request('/expenses');
+  }
+
+  async getExpenseStats(): Promise<ExpenseStats> {
+    return this.request('/expenses/stats');
   }
 }
 

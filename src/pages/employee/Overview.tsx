@@ -1,10 +1,6 @@
+import { useState, useEffect } from "react";
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-
-const spendingByCategory = [
-  { name: "Travel", value: 45, color: "#3ba8ff" },
-  { name: "Food", value: 30, color: "#38d788" },
-  { name: "Office", value: 25, color: "#ffa94d" }
-];
+import { useExpenseRefresh } from "../../context/ExpenseContext";
 
 const monthlyTrend = [
   { month: "Jul", value: 420 },
@@ -13,37 +9,118 @@ const monthlyTrend = [
   { month: "Oct", value: 520 }
 ];
 
-const recentExpenses = [
-  { date: "2025-11-01", vendor: "Coffee Shop", amount: "$45", category: "Food", status: "Approved" },
-  { date: "2025-10-30", vendor: "Uber", amount: "$28", category: "Travel", status: "Approved" },
-  { date: "2025-10-28", vendor: "Office Depot", amount: "$120", category: "Office", status: "Pending" },
-  { date: "2025-10-25", vendor: "Hotel XYZ", amount: "$250", category: "Travel", status: "Approved" },
-  { date: "2025-10-22", vendor: "Restaurant", amount: "$85", category: "Food", status: "Approved" }
-];
-
 const statusBadges: Record<string, string> = {
   Approved: "badge green",
   Pending: "badge yellow",
   Flagged: "badge red"
 };
 
+interface Expense {
+  id: number;
+  file: string;
+  uploadedAt: string;
+  category: string;
+  vendor: string;
+  total: number;
+  textPreview: string;
+  status: string;
+  confidence?: number;
+}
+
 export default function Overview() {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [spendingByCategory, setSpendingByCategory] = useState<Array<{ name: string; value: number; color: string }>>([]);
+  const [stats, setStats] = useState({
+    totalAmount: 0,
+    totalExpenses: 0,
+    byCategory: {} as Record<string, number>
+  });
+  const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useExpenseRefresh();
+
+  const API_URL = "http://localhost:5000";
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [refreshTrigger]);
+
+  const fetchExpenses = async () => {
+    try {
+      const response = await fetch(`${API_URL}/expenses`);
+      const data = await response.json();
+      if (data.success) {
+        const expensesList = data.expenses || [];
+        setExpenses(expensesList);
+        calculateStats(expensesList);
+      }
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateStats = (expensesList: Expense[]) => {
+    const totalAmount = expensesList.reduce((sum, e) => sum + (e.total || 0), 0);
+    const byCategory: Record<string, number> = {};
+    const colors: Record<string, string> = {
+      "Travel": "#3ba8ff",
+      "Food": "#38d788",
+      "Office": "#ffa94d",
+      "IT": "#ff7b7b",
+      "Other": "#a78bfa"
+    };
+
+    expensesList.forEach(expense => {
+      const cat = expense.category || "Other";
+      byCategory[cat] = (byCategory[cat] || 0) + (expense.total || 0);
+    });
+
+    const categoryData = Object.entries(byCategory).map(([name, value]) => ({
+      name,
+      value: Math.round((value / totalAmount) * 100) || 0,
+      color: colors[name] || "#a78bfa"
+    }));
+
+    setStats({
+      totalAmount,
+      totalExpenses: expensesList.length,
+      byCategory
+    });
+    setSpendingByCategory(categoryData);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD"
+    }).format(amount);
+  };
+
   return (
     <>
       <div className="grid cols-4">
         <div className="stat-card">
           <div className="stat-label">My Total Expenses</div>
-          <div className="stat-value">$728</div>
-          <div className="stat-label">This month</div>
+          <div className="stat-value">{formatCurrency(stats.totalAmount)}</div>
+          <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Receipts Uploaded</div>
-          <div className="stat-value">12</div>
+          <div className="stat-value">{stats.totalExpenses}</div>
           <div className="stat-label">Total submissions</div>
         </div>
         <div className="stat-card accent-yellow">
           <div className="stat-label">Pending Review</div>
-          <div className="stat-value">4</div>
+          <div className="stat-value">{expenses.filter(e => e.status === "Needs Review").length}</div>
           <div className="stat-label">Awaiting approval</div>
         </div>
         <div className="stat-card accent-green">
@@ -118,28 +195,36 @@ export default function Overview() {
             </tr>
           </thead>
           <tbody>
-            {recentExpenses.map((expense) => (
-              <tr key={expense.vendor + expense.date}>
-                <td>{expense.date}</td>
-                <td>{expense.vendor}</td>
-                <td>{expense.amount}</td>
-                <td>
-                  <span className="badge blue">{expense.category}</span>
-                </td>
-                <td>
-                  <span className={statusBadges[expense.status] ?? "badge yellow"}>{expense.status}</span>
-                </td>
-                <td>
-                  <a className="secondary-link" href="#">
-                    View
-                  </a>{" "}
-                  ·
-                  <a className="secondary-link" href="#">
-                    Edit
-                  </a>
+            {expenses.length > 0 ? (
+              expenses.slice(0, 5).map((expense) => (
+                <tr key={expense.id}>
+                  <td>{formatDate(expense.uploadedAt)}</td>
+                  <td>{expense.vendor || "N/A"}</td>
+                  <td>{formatCurrency(expense.total || 0)}</td>
+                  <td>
+                    <span className="badge blue">{expense.category || "Other"}</span>
+                  </td>
+                  <td>
+                    <span className={statusBadges[expense.status] ?? "badge yellow"}>{expense.status}</span>
+                  </td>
+                  <td>
+                    <a className="secondary-link" href="#">
+                      View
+                    </a>{" "}
+                    ·
+                    <a className="secondary-link" href="#">
+                      Edit
+                    </a>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} style={{ textAlign: "center", color: "#999" }}>
+                  No expenses uploaded yet
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

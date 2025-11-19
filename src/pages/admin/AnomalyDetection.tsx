@@ -1,13 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
-import type {
-  AnomalyDetectionProps,
-  FlaggedTransaction,
-  RecentFlag
-} from "./anomalyDetectionMockData";
-import { mockRootProps } from "./anomalyDetectionMockData";
 import { formatCurrency, formatDateTime, formatConfidence, formatPercentage } from "./anomalyDetectionUtils";
+
+interface AnomalyReasonData {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface FlaggedTransaction {
+  id: number;
+  dateTime: string;
+  vendorName: string;
+  category: string;
+  amount: number;
+  anomalyType: string;
+  severity: "Critical" | "High" | "Medium" | "Low";
+  confidence: number;
+}
+
+interface RecentFlag {
+  id: number;
+  severity: "Critical" | "High" | "Medium" | "Low";
+  title: string;
+  summary: string;
+  description?: string;
+  details?: string;
+  timestamp: string;
+}
 
 interface MetricCardProps {
   label: string;
@@ -43,14 +64,30 @@ function SeverityBadge({ severity }: SeverityBadgeProps) {
 
 interface FlaggedTransactionRowProps {
   transaction: FlaggedTransaction;
-  onView: (id: string) => void;
-  onReject: (id: string) => void;
+  onView: (id: number) => void;
+  onReject: (id: number) => void;
 }
 
 function FlaggedTransactionRow({ transaction, onView, onReject }: FlaggedTransactionRowProps) {
+  const formatTransactionDateTime = (dateStr: string): string => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <tr>
-      <td>{formatDateTime(transaction.dateTime)}</td>
+      <td>{formatTransactionDateTime(transaction.dateTime)}</td>
       <td>{transaction.vendorName}</td>
       <td>
         <span className="badge blue">{transaction.category}</span>
@@ -158,15 +195,131 @@ function AIExplainabilityCard({ flag }: AIExplainabilityCardProps) {
 }
 
 export default function AnomalyDetection() {
-  const data: AnomalyDetectionProps = mockRootProps;
+  const API_URL = "http://127.0.0.1:5000";
+  
+  const [totalCharges, setTotalCharges] = useState<number>(0);
+  const [anomalousTransactions, setAnomalousTransactions] = useState<number>(0);
+  const [averageDeviation, setAverageDeviation] = useState<number>(0);
+  const [detectionAccuracy, setDetectionAccuracy] = useState<number>(0);
+  const [modulationData, setModulationData] = useState<any[]>([]);
+  const [anomalyReasonDistribution, setAnomalyReasonDistribution] = useState<AnomalyReasonData[]>([]);
+  const [flaggedTransactions, setFlaggedTransactions] = useState<FlaggedTransaction[]>([]);
+  const [recentFlags, setRecentFlags] = useState<RecentFlag[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleView = (id: string) => {
+  useEffect(() => {
+    fetchAnomalyData();
+  }, []);
+
+  const fetchAnomalyData = async () => {
+    setLoading(true);
+    try {
+      const [statsRes, anomaliesRes, recentRes] = await Promise.all([
+        fetch(`${API_URL}/anomalies/stats`),
+        fetch(`${API_URL}/anomalies`),
+        fetch(`${API_URL}/anomalies/recent?limit=5`)
+      ]);
+
+      if (statsRes.ok && anomaliesRes.ok && recentRes.ok) {
+        const statsData = await statsRes.json();
+        const anomaliesData = await anomaliesRes.json();
+        const recentData = await recentRes.json();
+
+        if (statsData.success) {
+          setTotalCharges(statsData.totalCharges || 0);
+          setAnomalousTransactions(statsData.anomalousTransactions || 0);
+          setDetectionAccuracy(statsData.detectionAccuracy || 0);
+          
+          const anomalyTypeData = Object.entries(statsData.anomalyTypes || {}).map(([type, count]) => ({
+            name: type as string,
+            value: count as number,
+            color: getColorForAnomalyType(type)
+          }));
+          setAnomalyReasonDistribution(anomalyTypeData);
+          
+          if (anomaliesData.anomalies && anomaliesData.anomalies.length > 0) {
+            setAverageDeviation(
+              anomaliesData.anomalies.reduce((sum: number, a: any) => sum + a.amount, 0) / 
+              anomaliesData.anomalies.length
+            );
+          }
+        }
+
+        if (anomaliesData.success && anomaliesData.anomalies) {
+          const transactions = anomaliesData.anomalies.map((a: any) => ({
+            id: a.id,
+            dateTime: a.dateTime,
+            vendorName: a.vendorName,
+            category: a.category,
+            amount: a.amount,
+            anomalyType: a.anomalyType,
+            severity: a.severity,
+            confidence: a.confidence
+          }));
+          setFlaggedTransactions(transactions);
+        }
+
+        if (recentData.success && recentData.anomalies) {
+          const flags = recentData.anomalies.map((a: any) => ({
+            id: a.id,
+            severity: a.severity,
+            title: a.anomalyType,
+            summary: a.description,
+            description: a.description,
+            details: a.description,
+            timestamp: a.detectedAt
+          }));
+          setRecentFlags(flags);
+        }
+
+        setModulationData(generateModulationData(anomaliesData.anomalies || []));
+      }
+    } catch (err) {
+      console.error("Error fetching anomaly data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateModulationData = (anomalies: any[]) => {
+    const monthCounts: { [key: string]: number } = {};
+    const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    anomalies.forEach((a: any) => {
+      if (a.detectedAt) {
+        const date = new Date(a.detectedAt);
+        const monthName = monthOrder[date.getMonth()];
+        monthCounts[monthName] = (monthCounts[monthName] || 0) + 1;
+      }
+    });
+
+    return monthOrder.map(month => ({
+      month,
+      value: monthCounts[month] || 0
+    }));
+  };
+
+  const getColorForAnomalyType = (type: string): string => {
+    const colors: Record<string, string> = {
+      "Unusual Amount": "#ff6b6b",
+      "Duplicate Detection": "#ffa94d",
+      "Unusual Vendor": "#ffd93d",
+      "Unknown Vendor": "#6bcf7f"
+    };
+    return colors[type] || "#3ba8ff";
+  };
+
+  const handleView = (id: number) => {
     console.log("View transaction:", id);
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = (id: number) => {
     console.log("Reject transaction:", id);
   };
+
+  if (loading) {
+    return <div style={{ padding: "20px" }}>Loading anomaly data...</div>;
+  }
 
   return (
     <>
@@ -178,23 +331,23 @@ export default function AnomalyDetection() {
       <div className="grid cols-4">
         <MetricCard
           label="Total Charges"
-          value={formatCurrency(data.totalCharges)}
+          value={formatCurrency(totalCharges)}
           subtitle="This month"
         />
         <MetricCard
           label="Anomalous Transactions"
-          value={data.anomalousTransactions}
+          value={anomalousTransactions}
           subtitle="Detected anomalies"
         />
         <MetricCard
           label="Average Deviation Amount"
-          value={formatCurrency(data.averageDeviation)}
+          value={formatCurrency(averageDeviation)}
           subtitle="From baseline"
           accentClass="accent-yellow"
         />
         <MetricCard
           label="Detection Accuracy"
-          value={formatPercentage(data.detectionAccuracy)}
+          value={formatPercentage(detectionAccuracy)}
           subtitle="Success rate"
           accentClass="accent-green"
         />
@@ -207,7 +360,7 @@ export default function AnomalyDetection() {
           </div>
           <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={data.modulationData}>
+              <LineChart data={modulationData}>
                 <XAxis
                   dataKey="month"
                   stroke="#5870a5"
@@ -246,13 +399,13 @@ export default function AnomalyDetection() {
             <ResponsiveContainer>
               <PieChart>
                 <Pie
-                  data={data.anomalyReasonDistribution}
+                  data={anomalyReasonDistribution}
                   dataKey="value"
                   innerRadius={60}
                   outerRadius={100}
                   paddingAngle={4}
                 >
-                  {data.anomalyReasonDistribution.map((entry) => (
+                  {anomalyReasonDistribution.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
@@ -268,7 +421,7 @@ export default function AnomalyDetection() {
             </ResponsiveContainer>
           </div>
           <div className="grid cols-2" style={{ marginTop: "16px" }}>
-            {data.anomalyReasonDistribution.map((item) => (
+            {anomalyReasonDistribution.map((item) => (
               <div key={item.name} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <div
                   style={{
@@ -279,7 +432,7 @@ export default function AnomalyDetection() {
                   }}
                 />
                 <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                  {item.name} ({item.value}%)
+                  {item.name} ({item.value})
                 </span>
               </div>
             ))}
@@ -305,7 +458,7 @@ export default function AnomalyDetection() {
             </tr>
           </thead>
           <tbody>
-            {data.flaggedTransactions.map((transaction) => (
+            {flaggedTransactions.map((transaction) => (
               <FlaggedTransactionRow
                 key={transaction.id}
                 transaction={transaction}
@@ -322,7 +475,7 @@ export default function AnomalyDetection() {
           <h3>AI Explainability - Recent Flags</h3>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {data.recentFlags.map((flag) => (
+          {recentFlags.map((flag) => (
             <AIExplainabilityCard key={flag.id} flag={flag} />
           ))}
         </div>
