@@ -34,6 +34,7 @@ const MOCK_TREND_DATA = [
 
 export const EmployeeDashboard: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [recentUploads, setRecentUploads] = useState<Expense[]>([]);
   const [stats, setStats] = useState<ExpenseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +43,10 @@ export const EmployeeDashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const [expensesData, statsData] = await Promise.all([
+        const [expensesData, statsData, uploadsData] = await Promise.all([
           apiService.getExpenses(),
-          apiService.getExpenseStats()
+          apiService.getExpenseStats(),
+          apiService.getRecentUploads()
         ]);
 
         if (expensesData.success) {
@@ -52,6 +54,9 @@ export const EmployeeDashboard: React.FC = () => {
         }
         if (statsData.success) {
           setStats(statsData);
+        }
+        if (uploadsData.success) {
+          setRecentUploads(uploadsData.uploads);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -224,29 +229,35 @@ export const EmployeeDashboard: React.FC = () => {
 
             {/* Recent Expenses */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Recent Expenses</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Recent Uploads</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">DAVIS AVE</p>
-                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
-                  </div>
-                  <span className="text-white font-bold">$23,223</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">WADHWA</p>
-                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
-                  </div>
-                  <span className="text-white font-bold">$12</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">DAVIS AVE</p>
-                    <p className="text-gray-400 text-sm">Food • Nov 17, 2025</p>
-                  </div>
-                  <span className="text-white font-bold">$23,223</span>
-                </div>
+                {loading ? (
+                  <p className="text-gray-400">Loading recent uploads...</p>
+                ) : recentUploads.length > 0 ? (
+                  recentUploads.slice(0, 3).map((upload) => (
+                    <div key={upload.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-medium truncate">{upload.vendor || 'Unknown'}</p>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            upload.anomalyStatus === 'flagged' 
+                              ? 'bg-red-500/20 text-red-300' 
+                              : 'bg-green-500/20 text-green-300'
+                          }`}>
+                            {upload.anomalyStatus === 'flagged' ? '⚠️ Flagged' : '✓ Normal'}
+                          </span>
+                        </div>
+                        <p className="text-gray-400 text-sm">{upload.category} • {new Date(upload.uploadedAt).toLocaleDateString()}</p>
+                        {upload.anomalyStatus === 'flagged' && upload.anomalyReason && (
+                          <p className="text-yellow-400 text-xs mt-1 truncate">{upload.anomalyReason}</p>
+                        )}
+                      </div>
+                      <span className="text-white font-bold ml-4">${upload.total.toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400">No recent uploads yet</p>
+                )}
               </div>
             </div>
 

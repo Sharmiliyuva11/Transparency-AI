@@ -16,9 +16,10 @@ type DashboardLayoutProps = {
   user: string
   sidebarItems: SidebarItem[]
   children: ReactNode
+  onSidebarClick?: (label: string) => void
 }
 
-export function DashboardLayout({ role, user, sidebarItems, children }: DashboardLayoutProps) {
+export function DashboardLayout({ role, user, sidebarItems, children, onSidebarClick }: DashboardLayoutProps) {
   return (
     <div className="dashboard-shell">
       <aside className="dashboard-sidebar">
@@ -35,6 +36,7 @@ export function DashboardLayout({ role, user, sidebarItems, children }: Dashboar
               key={item.label}
               className={`sidebar-link${item.active ? ' active' : ''}`}
               type="button"
+              onClick={() => onSidebarClick?.(item.label)}
             >
               <span className="sidebar-icon">{item.icon}</span>
               {item.label}

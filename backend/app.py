@@ -57,6 +57,8 @@ class Expense(db.Model):
     amount = db.Column(db.Float)
     text_preview = db.Column(db.Text)
     status = db.Column(db.String(50), default="Processed")
+    anomaly_status = db.Column(db.String(50), default="normal")
+    anomaly_reason = db.Column(db.Text, default="")
 
     def to_dict(self):
         return {
@@ -67,7 +69,9 @@ class Expense(db.Model):
             "vendor": self.vendor,
             "total": self.amount,
             "textPreview": self.text_preview,
-            "status": self.status
+            "status": self.status,
+            "anomalyStatus": self.anomaly_status,
+            "anomalyReason": self.anomaly_reason
         }
 
 
@@ -281,6 +285,61 @@ def extract_vendor(text: str) -> str:
     return lines[0] if lines else ""
 
 
+def detect_anomaly(expense: Expense) -> tuple[str, str]:
+    """Detect anomalies in an expense transaction."""
+    anomalies = []
+    
+    all_expenses = Expense.query.all()
+    
+    if not all_expenses or len(all_expenses) < 2:
+        return "normal", ""
+    
+    category_amounts = {}
+    for exp in all_expenses:
+        if exp.category not in category_amounts:
+            category_amounts[exp.category] = []
+        category_amounts[exp.category].append(exp.amount)
+    
+    if expense.category in category_amounts:
+        amounts = category_amounts[expense.category]
+        avg_amount = sum(amounts) / len(amounts) if amounts else 0
+        
+        if avg_amount > 0:
+            deviation_percent = abs(expense.amount - avg_amount) / avg_amount * 100
+            
+            if deviation_percent > 100 and expense.amount > avg_amount * 2:
+                anomalies.append(f"Amount ({expense.amount}) significantly exceeds category average ({avg_amount:.2f})")
+            
+            if expense.amount > 5000:
+                anomalies.append(f"High transaction amount: {expense.amount}")
+    
+    vendor_count = {}
+    vendor_total = {}
+    for exp in all_expenses:
+        if exp.vendor:
+            vendor_count[exp.vendor] = vendor_count.get(exp.vendor, 0) + 1
+            vendor_total[exp.vendor] = vendor_total.get(exp.vendor, 0) + exp.amount
+    
+    if expense.vendor and expense.vendor in vendor_total and vendor_count[expense.vendor] == 1:
+        avg_vendor_amount = vendor_total[expense.vendor]
+        if avg_vendor_amount > 1000 and vendor_count[expense.vendor] == 1:
+            anomalies.append(f"First transaction with this vendor ({expense.vendor})")
+    
+    duplicate_vendors = [exp for exp in all_expenses 
+                        if exp.vendor == expense.vendor 
+                        and exp.id != expense.id 
+                        and exp.amount == expense.amount
+                        and (datetime.utcnow() - exp.uploaded_at).days < 7]
+    
+    if duplicate_vendors:
+        anomalies.append(f"Potential duplicate transaction with {expense.vendor}")
+    
+    if anomalies:
+        return "flagged", "; ".join(anomalies)
+    
+    return "normal", ""
+
+
 # ------------------------
 # Routes
 # ------------------------
@@ -319,6 +378,11 @@ def ocr():
         db.session.add(expense)
         db.session.commit()
 
+        anomaly_status, anomaly_reason = detect_anomaly(expense)
+        expense.anomaly_status = anomaly_status
+        expense.anomaly_reason = anomaly_reason
+        db.session.commit()
+
         recent_uploads.appendleft(expense.to_dict())
 
         os.remove(filepath)
@@ -327,7 +391,9 @@ def ocr():
             "success": True,
             "text": text,
             "classification": {"label": category, "score": 0.0},
-            "entities": entities
+            "entities": entities,
+            "anomalyStatus": anomaly_status,
+            "anomalyReason": anomaly_reason
         })
 
     except Exception as error:
@@ -363,7 +429,11 @@ def analyze():
 
 @app.route("/recent-uploads", methods=["GET"])
 def recent_uploads_api():
-    return jsonify({"success": True, "uploads": list(recent_uploads)})
+    try:
+        uploads = Expense.query.order_by(Expense.uploaded_at.desc()).limit(20).all()
+        return jsonify({"success": True, "uploads": [e.to_dict() for e in uploads]})
+    except Exception as e:
+        return jsonify({"error": f"Failed to get recent uploads: {str(e)}"}), 500
 
 
 @app.route("/expenses", methods=["GET"])
@@ -485,6 +555,52 @@ def get_monthly_trends():
 
     except Exception as e:
         return jsonify({"error": f"Failed to get monthly trends: {str(e)}"}), 500
+
+
+@app.route("/anomalies", methods=["GET"])
+def get_anomalies():
+    try:
+        anomalies = Expense.query.filter_by(anomaly_status="flagged").all()
+        normal = Expense.query.filter_by(anomaly_status="normal").all()
+        
+        stats = {
+            "flagged_count": len(anomalies),
+            "normal_count": len(normal),
+            "flagged_percentage": round((len(anomalies) / (len(anomalies) + len(normal)) * 100), 2) if (len(anomalies) + len(normal)) > 0 else 0
+        }
+        
+        return jsonify({
+            "success": True,
+            "anomalies": [e.to_dict() for e in anomalies],
+            "stats": stats
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Failed to get anomalies: {str(e)}"}), 500
+
+
+@app.route("/anomalies/recheck/<int:expense_id>", methods=["POST"])
+def recheck_anomaly(expense_id):
+    try:
+        expense = Expense.query.get(expense_id)
+        if not expense:
+            return jsonify({"error": "Expense not found"}), 404
+        
+        anomaly_status, anomaly_reason = detect_anomaly(expense)
+        expense.anomaly_status = anomaly_status
+        expense.anomaly_reason = anomaly_reason
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "anomalyStatus": anomaly_status,
+            "anomalyReason": anomaly_reason,
+            "expense": expense.to_dict()
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to recheck anomaly: {str(e)}"}), 500
 
 
 # ------------------------
@@ -631,20 +747,30 @@ def migrate_database():
     try:
         from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
-        cols = [c["name"] for c in inspector.get_columns("user_settings")]
+        
+        user_settings_cols = [c["name"] for c in inspector.get_columns("user_settings")]
+        expense_cols = [c["name"] for c in inspector.get_columns("expense")]
 
         needed = False
 
-        if "logo_path" not in cols:
+        if "logo_path" not in user_settings_cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN logo_path VARCHAR(255)"))
             needed = True
 
-        if "contact_info" not in cols:
+        if "contact_info" not in user_settings_cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN contact_info TEXT"))
             needed = True
 
-        if "help_content" not in cols:
+        if "help_content" not in user_settings_cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN help_content TEXT"))
+            needed = True
+
+        if "anomaly_status" not in expense_cols:
+            db.session.execute(text("ALTER TABLE expense ADD COLUMN anomaly_status VARCHAR(50) DEFAULT 'normal'"))
+            needed = True
+
+        if "anomaly_reason" not in expense_cols:
+            db.session.execute(text("ALTER TABLE expense ADD COLUMN anomaly_reason TEXT DEFAULT ''"))
             needed = True
 
         if needed:

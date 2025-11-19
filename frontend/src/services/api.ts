@@ -10,6 +10,8 @@ export interface Expense {
   total: number;
   textPreview: string;
   status: string;
+  anomalyStatus?: string;
+  anomalyReason?: string;
 }
 
 export interface ExpenseStats {
@@ -18,6 +20,12 @@ export interface ExpenseStats {
   total_amount: number;
   by_category: Record<string, number>;
   category_percentages: Record<string, number>;
+}
+
+export interface AnomalyStats {
+  flagged_count: number;
+  normal_count: number;
+  flagged_percentage: number;
 }
 
 export interface ExpensesByCategory {
@@ -93,6 +101,14 @@ class ApiService {
 
   async getRecentUploads(): Promise<{ success: boolean; uploads: Expense[] }> {
     return this.request('/recent-uploads');
+  }
+
+  async getAnomalies(): Promise<{ success: boolean; anomalies: Expense[]; stats: AnomalyStats }> {
+    return this.request('/anomalies');
+  }
+
+  async recheckAnomaly(expenseId: number): Promise<{ success: boolean; expense: Expense; anomalyStatus: string; anomalyReason: string }> {
+    return this.request(`/anomalies/recheck/${expenseId}`, 'POST');
   }
 
   async getSettings(role: string): Promise<{ success: boolean; settings: UserSettings }> {

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FiHome, FiUsers, FiBarChart, FiSettings } from 'react-icons/fi';
+import { FiHome, FiUsers, FiBarChart, FiSettings, FiAlertTriangle } from 'react-icons/fi';
 import { apiService, type UserSettings } from '../services/api';
 import type { SidebarItem } from '../components/DashboardLayout';
+import { AnomalyDetectionPage } from './AnomalyDetectionPage';
 
 const adminSidebarItems: SidebarItem[] = [
   { label: 'Dashboard', icon: <FiHome />, active: true },
+  { label: 'Anomaly Detection', icon: <FiAlertTriangle /> },
   { label: 'User Management', icon: <FiUsers /> },
   { label: 'Analytics', icon: <FiBarChart /> },
   { label: 'Settings', icon: <FiSettings /> },
@@ -72,6 +74,7 @@ export const AdminDashboard: React.FC = () => {
   void MOCK_DEPARTMENT_DATA;
   void MOCK_TREND_DATA;
 
+  const [activePage, setActivePage] = useState<string>('Dashboard');
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -145,22 +148,22 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout role="Admin" user="Mike Johnson" sidebarItems={adminSidebarItems}>
-        <div className="flex items-center justify-center h-screen">
-          <p className="text-white">Loading settings...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const handleSidebarClick = (label: string) => {
+    setActivePage(label);
+  };
 
-  return (
-    <DashboardLayout
-      role="Admin"
-      user="Mike Johnson"
-      sidebarItems={adminSidebarItems}
-    >
+  const renderActivePageContent = (): React.ReactNode => {
+    switch (activePage) {
+      case 'Anomaly Detection':
+        return <AnomalyDetectionPage />;
+      case 'Dashboard':
+      default:
+        return renderDashboardContent();
+    }
+  };
+
+  const renderDashboardContent = (): React.ReactNode => {
+    return (
       <div className="flex h-screen bg-gray-900">
         {/* Left Side - AI Assistant */}
         <div className="w-1/2 p-6 border-r border-gray-700">
@@ -468,6 +471,37 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+    );
+  };
+
+  if (loading && activePage === 'Dashboard') {
+    return (
+      <DashboardLayout 
+        role="Admin" 
+        user="Mike Johnson" 
+        sidebarItems={adminSidebarItems}
+        onSidebarClick={handleSidebarClick}
+      >
+        <div className="flex items-center justify-center h-screen">
+          <p className="text-white">Loading settings...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const updatedSidebarItems = adminSidebarItems.map(item => ({
+    ...item,
+    active: item.label === activePage
+  }));
+
+  return (
+    <DashboardLayout
+      role="Admin"
+      user="Mike Johnson"
+      sidebarItems={updatedSidebarItems}
+      onSidebarClick={handleSidebarClick}
+    >
+      {renderActivePageContent()}
     </DashboardLayout>
   );
 };

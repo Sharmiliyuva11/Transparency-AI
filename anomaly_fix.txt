@@ -1,0 +1,11 @@
+Fixing anomaly status for all existing expenses...
+
+Found 3 expenses
+
+Processing each expense...
+============================================================
+Summary:
+  Total: 3
+  Flagged: 1
+  Normal: 2
+============================================================
