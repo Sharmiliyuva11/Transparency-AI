@@ -4,6 +4,8 @@ import { FiHome, FiUsers, FiBarChart, FiSettings, FiAlertTriangle } from 'react-
 import { apiService, type UserSettings } from '../services/api';
 import type { SidebarItem } from '../components/DashboardLayout';
 import { AnomalyDetectionPage } from './AnomalyDetectionPage';
+import { UserManagement } from './UserManagement';
+import { Analytics } from './Analytics';
 
 const adminSidebarItems: SidebarItem[] = [
   { label: 'Dashboard', icon: <FiHome />, active: true },
@@ -156,6 +158,10 @@ export const AdminDashboard: React.FC = () => {
     switch (activePage) {
       case 'Anomaly Detection':
         return <AnomalyDetectionPage />;
+      case 'User Management':
+        return <UserManagement />;
+      case 'Analytics':
+        return <Analytics />;
       case 'Dashboard':
       default:
         return renderDashboardContent();

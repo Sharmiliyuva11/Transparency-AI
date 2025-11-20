@@ -118,6 +118,26 @@ class ApiService {
   async updateSettings(role: string, settings: Partial<UserSettings>): Promise<{ success: boolean; settings: UserSettings }> {
     return this.request(`/settings/${role}`, 'PUT', settings);
   }
+
+  async getAdminUsers(): Promise<{ success: boolean; users: Array<{ id: string; name: string; email: string; department: string; role: string; status: string; joinedDate: string }>; adminUsersCount: number; staffEmployeesCount: number; auditorsCount: number }> {
+    return this.request('/api/admin/users');
+  }
+
+  async createUser(userData: { name: string; email: string; department: string; organization: string }): Promise<{ success: boolean; message: string; user: { id: string; name: string; email: string; department: string; role: string; status: string; joinedDate: string } }> {
+    return this.request('/api/admin/users', 'POST', userData);
+  }
+
+  async updateUser(userId: string, userData: { name?: string; email?: string; department?: string }): Promise<{ success: boolean; message: string; user: { id: string; name: string; email: string; department: string; role: string; status: string; joinedDate: string } }> {
+    return this.request(`/api/admin/users/${userId}`, 'PUT', userData);
+  }
+
+  async deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/admin/users/${userId}`, 'DELETE');
+  }
+
+  async getAdminReports(): Promise<{ success: boolean; totalExpenses: number; complianceRate: number; averagePerTransaction: number; flaggedItems: number; expenseTrendData: Array<{ month: string; amount: number }>; aiInsights: Array<{ id: string; type: string; severity: string; message: string }> }> {
+    return this.request('/api/admin/reports');
+  }
 }
 
 export const apiService = new ApiService();

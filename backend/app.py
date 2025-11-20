@@ -821,7 +821,6 @@ def get_admin_reports():
             "averagePerTransaction": round(average_per_transaction, 2),
             "flaggedItems": flagged_items,
             "expenseTrendData": expense_trend_data,
-            "categorySpendingData": category_spending_data,
             "aiInsights": ai_insights
         })
     except Exception as e:
@@ -924,6 +923,62 @@ def create_new_user():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
+
+
+@app.route("/api/admin/users/<user_id>", methods=["PUT"])
+def update_user(user_id):
+    try:
+        data = request.get_json()
+        user = UserSettings.query.filter_by(user_id=user_id).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        if "name" in data:
+            user.display_name = data.get("name")
+        if "email" in data:
+            user.email = data.get("email")
+        if "department" in data:
+            user.industry = data.get("department")
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "User updated successfully",
+            "user": {
+                "id": str(user.user_id),
+                "name": user.display_name,
+                "email": user.email,
+                "department": user.industry,
+                "role": "User",
+                "status": "Active",
+                "joinedDate": user.created_at.isoformat() if user.created_at else "2024-01-01T00:00:00"
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to update user: {str(e)}"}), 500
+
+
+@app.route("/api/admin/users/<user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    try:
+        user = UserSettings.query.filter_by(user_id=user_id).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        db.session.delete(user)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "User deleted successfully"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to delete user: {str(e)}"}), 500
 
 
 @app.route("/api/admin/users/roles-permissions", methods=["GET"])
