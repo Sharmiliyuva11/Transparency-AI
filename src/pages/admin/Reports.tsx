@@ -88,35 +88,12 @@ export default function Reports() {
   const [data, setData] = useState<ReportsProps | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("All Categories");
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/categories");
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setCategories(["All Categories", ...result.categories]);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching categories:", err);
-      }
-    };
-    fetchCategories();
-  }, []);
 
   useEffect(() => {
     const fetchReportsData = async () => {
       try {
         setLoading(true);
-        const url = new URL("http://localhost:5000/api/admin/reports");
-        if (selectedCategory !== "All Categories") {
-          url.searchParams.append("category", selectedCategory);
-        }
-        const response = await fetch(url.toString());
+        const response = await fetch("http://localhost:5000/api/admin/reports");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -128,7 +105,6 @@ export default function Reports() {
             averagePerTransaction: result.averagePerTransaction,
             flaggedItems: result.flaggedItems,
             expenseTrendData: result.expenseTrendData,
-            categorySpendingData: result.categorySpendingData,
             aiInsights: result.aiInsights
           });
         } else {
@@ -144,7 +120,7 @@ export default function Reports() {
     };
 
     fetchReportsData();
-  }, [selectedCategory]);
+  }, []);
 
   if (loading) {
     return (
@@ -169,7 +145,7 @@ export default function Reports() {
         <p className="dashboard-subtitle">Comprehensive analytics for tracking, spending, and anomalies</p>
       </div>
 
-      <div className="grid cols-2">
+      <div className="grid cols-1">
         <div className="section-card">
           <div className="section-header">
             <h3>Expense Trend Over Time</h3>
@@ -215,67 +191,6 @@ export default function Reports() {
                   dot={{ r: 5, fill: "#3ba8ff" }}
                 />
               </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="section-card">
-          <div className="section-header">
-            <h3>Category-Wise Spending</h3>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid rgba(71,102,190,0.45)",
-                background: "#0c1736",
-                color: "var(--text-primary)",
-                fontSize: "13px",
-                fontWeight: 500,
-                cursor: "pointer"
-              }}
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer>
-              <BarChart data={data.categorySpendingData} layout="horizontal">
-                <XAxis
-                  type="number"
-                  stroke="#5870a5"
-                  tickLine={false}
-                  axisLine={false}
-                  style={{ fontSize: "12px" }}
-                  tickFormatter={(value) => formatCompactCurrency(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  stroke="#5870a5"
-                  tickLine={false}
-                  axisLine={false}
-                  style={{ fontSize: "12px" }}
-                  width={80}
-                />
-                <Tooltip
-                  cursor={{ fill: "rgba(59, 168, 255, 0.1)" }}
-                  contentStyle={{
-                    background: "#0c1736",
-                    borderRadius: 12,
-                    border: "1px solid rgba(71,102,190,0.45)"
-                  }}
-                  labelStyle={{ color: "#99a5cc" }}
-                  itemStyle={{ color: "#e6ecff" }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Bar dataKey="amount" fill="#ff6b6b" radius={[0, 8, 8, 0]} />
-              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>

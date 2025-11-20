@@ -161,6 +161,11 @@ export default function UserManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", department: "" });
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const fetchUserData = async () => {
     try {
@@ -267,15 +272,100 @@ export default function UserManagement() {
   );
 
   const handleView = (id: string) => {
-    console.log("View user:", id);
+    const user = data?.users.find((u) => u.id === id);
+    if (user) {
+      setSelectedUser(user);
+      setShowViewModal(true);
+    }
   };
 
   const handleEdit = (id: string) => {
-    console.log("Edit user:", id);
+    const user = data?.users.find((u) => u.id === id);
+    if (user) {
+      setSelectedUser(user);
+      setEditForm({ name: user.name, email: user.email, department: user.department });
+      setShowEditModal(true);
+    }
   };
 
   const handleDelete = (id: string) => {
-    console.log("Delete user:", id);
+    setDeleteConfirm(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    
+    try {
+      setSubmitting(true);
+      const response = await fetch(`http://localhost:5000/api/admin/users/${deleteConfirm}`, {
+        method: "DELETE"
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete user");
+      }
+
+      setSuccessMessage("User deleted successfully!");
+      setDeleteConfirm(null);
+      
+      setTimeout(() => {
+        fetchUserData();
+        setSuccessMessage(null);
+      }, 1000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete user";
+      setSubmitError(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError(null);
+
+    if (!editForm.name || !editForm.email) {
+      setSubmitError("Name and email are required");
+      return;
+    }
+
+    if (!selectedUser) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: editForm.name,
+          email: editForm.email,
+          department: editForm.department
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update user");
+      }
+
+      setSuccessMessage("User updated successfully!");
+      setShowEditModal(false);
+      
+      setTimeout(() => {
+        fetchUserData();
+        setSuccessMessage(null);
+      }, 1000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update user";
+      setSubmitError(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -397,6 +487,292 @@ export default function UserManagement() {
           />
         </div>
       </div>
+
+      {showViewModal && selectedUser && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.7)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "var(--bg-secondary)",
+            borderRadius: "12px",
+            padding: "24px",
+            maxWidth: "400px",
+            width: "90%",
+            border: "1px solid rgba(71,102,190,0.45)"
+          }}>
+            <h3 style={{ marginBottom: "20px", color: "var(--text-primary)" }}>User Details</h3>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Name
+              </label>
+              <div style={{ padding: "10px 12px", background: "var(--bg-primary)", borderRadius: "6px", color: "var(--text-primary)" }}>
+                {selectedUser.name}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Email
+              </label>
+              <div style={{ padding: "10px 12px", background: "var(--bg-primary)", borderRadius: "6px", color: "var(--text-primary)" }}>
+                {selectedUser.email}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Department
+              </label>
+              <div style={{ padding: "10px 12px", background: "var(--bg-primary)", borderRadius: "6px", color: "var(--text-primary)" }}>
+                {selectedUser.department}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Role
+              </label>
+              <div style={{ padding: "10px 12px", background: "var(--bg-primary)", borderRadius: "6px", color: "var(--text-primary)" }}>
+                <RoleBadge role={selectedUser.role} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Status
+              </label>
+              <div style={{ padding: "10px 12px", background: "var(--bg-primary)", borderRadius: "6px", color: "var(--text-primary)" }}>
+                <StatusBadge status={selectedUser.status} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setShowViewModal(false)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid rgba(71,102,190,0.45)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 500
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && selectedUser && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.7)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "var(--bg-secondary)",
+            borderRadius: "12px",
+            padding: "24px",
+            maxWidth: "400px",
+            width: "90%",
+            border: "1px solid rgba(71,102,190,0.45)"
+          }}>
+            <h3 style={{ marginBottom: "16px", color: "var(--text-primary)" }}>Edit User</h3>
+            
+            {submitError && (
+              <div style={{
+                padding: "10px 12px",
+                marginBottom: "16px",
+                background: "#2e1415",
+                border: "1px solid #ff6b6b",
+                borderRadius: "6px",
+                color: "#ff6b6b",
+                fontSize: "13px"
+              }}>
+                {submitError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateUser}>
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter full name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="input-field"
+                  style={{ width: "100%" }}
+                  disabled={submitting}
+                />
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="input-field"
+                  style={{ width: "100%" }}
+                  disabled={submitting}
+                />
+              </div>
+
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", marginBottom: "6px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                  Department
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter department"
+                  value={editForm.department}
+                  onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                  className="input-field"
+                  style={{ width: "100%" }}
+                  disabled={submitting}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(71,102,190,0.45)",
+                    background: "transparent",
+                    color: "var(--text-secondary)",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500
+                  }}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={submitting}
+                  style={{ opacity: submitting ? 0.6 : 1 }}
+                >
+                  {submitting ? "Updating..." : "Update User"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.7)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "var(--bg-secondary)",
+            borderRadius: "12px",
+            padding: "24px",
+            maxWidth: "400px",
+            width: "90%",
+            border: "1px solid rgba(71,102,190,0.45)"
+          }}>
+            <h3 style={{ marginBottom: "16px", color: "var(--text-primary)" }}>Delete User</h3>
+            
+            <p style={{ marginBottom: "20px", color: "var(--text-secondary)" }}>
+              Are you sure you want to delete this user? This action cannot be undone.
+            </p>
+
+            {submitError && (
+              <div style={{
+                padding: "10px 12px",
+                marginBottom: "16px",
+                background: "#2e1415",
+                border: "1px solid #ff6b6b",
+                borderRadius: "6px",
+                color: "#ff6b6b",
+                fontSize: "13px"
+              }}>
+                {submitError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid rgba(71,102,190,0.45)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 500
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#ff6b6b",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 500
+                }}
+                disabled={submitting}
+              >
+                {submitting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddUserModal && (
         <div style={{
