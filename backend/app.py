@@ -57,8 +57,6 @@ class Expense(db.Model):
     amount = db.Column(db.Float)
     text_preview = db.Column(db.Text)
     status = db.Column(db.String(50), default="Processed")
-    anomaly_status = db.Column(db.String(50), default="normal")
-    anomaly_reason = db.Column(db.Text, default="")
 
     def to_dict(self):
         return {
@@ -69,9 +67,7 @@ class Expense(db.Model):
             "vendor": self.vendor,
             "total": self.amount,
             "textPreview": self.text_preview,
-            "status": self.status,
-            "anomalyStatus": self.anomaly_status,
-            "anomalyReason": self.anomaly_reason
+            "status": self.status
         }
 
 
@@ -203,11 +199,11 @@ def extract_amount(text: str) -> float:
 
     # Strategy 1: Look for lines with "TOTAL" and extract the amount
     total_patterns = [
-        r'TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
-        r'AMOUNT DUE[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
-        r'GRAND TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
-        r'FINAL TOTAL[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',
-        r'BALANCE DUE[:\s]*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)'
+        r'TOTAL[:\s]\$?(\d+(?:,\d{3})(?:\.\d{2})?)',
+        r'AMOUNT DUE[:\s]\$?(\d+(?:,\d{3})(?:\.\d{2})?)',
+        r'GRAND TOTAL[:\s]\$?(\d+(?:,\d{3})(?:\.\d{2})?)',
+        r'FINAL TOTAL[:\s]\$?(\d+(?:,\d{3})(?:\.\d{2})?)',
+        r'BALANCE DUE[:\s]\$?(\d+(?:,\d{3})(?:\.\d{2})?)'
     ]
 
     for pattern in total_patterns:
@@ -456,9 +452,7 @@ def ocr():
             "success": True,
             "text": text,
             "classification": {"label": category, "score": 0.0},
-            "entities": entities,
-            "anomalyStatus": anomaly_status,
-            "anomalyReason": anomaly_reason
+            "entities": entities
         })
 
     except Exception as error:
@@ -494,11 +488,7 @@ def analyze():
 
 @app.route("/recent-uploads", methods=["GET"])
 def recent_uploads_api():
-    try:
-        uploads = Expense.query.order_by(Expense.uploaded_at.desc()).limit(20).all()
-        return jsonify({"success": True, "uploads": [e.to_dict() for e in uploads]})
-    except Exception as e:
-        return jsonify({"error": f"Failed to get recent uploads: {str(e)}"}), 500
+    return jsonify({"success": True, "uploads": list(recent_uploads)})
 
 
 @app.route("/expenses", methods=["GET"])
@@ -642,52 +632,6 @@ def get_monthly_trends():
 
     except Exception as e:
         return jsonify({"error": f"Failed to get monthly trends: {str(e)}"}), 500
-
-
-@app.route("/anomalies", methods=["GET"])
-def get_anomalies():
-    try:
-        anomalies = Expense.query.filter_by(anomaly_status="flagged").all()
-        normal = Expense.query.filter_by(anomaly_status="normal").all()
-        
-        stats = {
-            "flagged_count": len(anomalies),
-            "normal_count": len(normal),
-            "flagged_percentage": round((len(anomalies) / (len(anomalies) + len(normal)) * 100), 2) if (len(anomalies) + len(normal)) > 0 else 0
-        }
-        
-        return jsonify({
-            "success": True,
-            "anomalies": [e.to_dict() for e in anomalies],
-            "stats": stats
-        })
-    
-    except Exception as e:
-        return jsonify({"error": f"Failed to get anomalies: {str(e)}"}), 500
-
-
-@app.route("/anomalies/recheck/<int:expense_id>", methods=["POST"])
-def recheck_anomaly(expense_id):
-    try:
-        expense = Expense.query.get(expense_id)
-        if not expense:
-            return jsonify({"error": "Expense not found"}), 404
-        
-        anomaly_status, anomaly_reason = detect_anomaly(expense)
-        expense.anomaly_status = anomaly_status
-        expense.anomaly_reason = anomaly_reason
-        db.session.commit()
-        
-        return jsonify({
-            "success": True,
-            "anomalyStatus": anomaly_status,
-            "anomalyReason": anomaly_reason,
-            "expense": expense.to_dict()
-        })
-    
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"Failed to recheck anomaly: {str(e)}"}), 500
 
 
 # ------------------------
@@ -917,30 +861,20 @@ def migrate_database():
     try:
         from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
-        
-        user_settings_cols = [c["name"] for c in inspector.get_columns("user_settings")]
-        expense_cols = [c["name"] for c in inspector.get_columns("expense")]
+        cols = [c["name"] for c in inspector.get_columns("user_settings")]
 
         needed = False
 
-        if "logo_path" not in user_settings_cols:
+        if "logo_path" not in cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN logo_path VARCHAR(255)"))
             needed = True
 
-        if "contact_info" not in user_settings_cols:
+        if "contact_info" not in cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN contact_info TEXT"))
             needed = True
 
-        if "help_content" not in user_settings_cols:
+        if "help_content" not in cols:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN help_content TEXT"))
-            needed = True
-
-        if "anomaly_status" not in expense_cols:
-            db.session.execute(text("ALTER TABLE expense ADD COLUMN anomaly_status VARCHAR(50) DEFAULT 'normal'"))
-            needed = True
-
-        if "anomaly_reason" not in expense_cols:
-            db.session.execute(text("ALTER TABLE expense ADD COLUMN anomaly_reason TEXT DEFAULT ''"))
             needed = True
 
         if needed:
