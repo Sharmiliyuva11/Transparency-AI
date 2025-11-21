@@ -1,75 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-// Category spending data
-const categorySpending = [
-  { category: "Travel", amount: 15200, change: "+1.6% vs last month", color: "#3ba8ff" },
-  { category: "Food", amount: 3400, change: "+1.6% vs last month", color: "#38d788" },
-  { category: "Office", amount: 5800, change: "+1.6% vs last month", color: "#ffa94d" },
-  { category: "IT", amount: 8900, change: "+1.6% vs last month", color: "#ff6b6b" },
-  { category: "Misc", amount: 6700, change: "+1.6% vs last month", color: "#a78bfa" }
-];
+interface CategorySpending {
+  category: string;
+  amount: number;
+  change: string;
+}
 
-// Category-wise spending distribution (horizontal bar chart)
-const spendingDistribution = [
-  { category: "Misc", value: 1.8 },
-  { category: "IT", value: 2.4 },
-  { category: "Office", value: 1.6 },
-  { category: "Food", value: 0.9 },
-  { category: "Travel", value: 4.2 }
-];
+interface SpendingItem {
+  category: string;
+  value: number;
+}
 
-// Category comparison over time
-const categoryTrends = [
-  { month: "Jul", Food: 3200, IT: 8500, Misc: 6400, Office: 5600, Travel: 14800 },
-  { month: "Aug", Food: 3300, IT: 8700, Misc: 6500, Office: 5700, Travel: 15000 },
-  { month: "Sep", Food: 3350, IT: 8800, Misc: 6600, Office: 5750, Travel: 15100 },
-  { month: "Oct", Food: 3400, IT: 8900, Misc: 6700, Office: 5800, Travel: 15200 }
-];
+interface CategoryExpense {
+  date: string;
+  vendor: string;
+  amount: number;
+  status: "Flagged" | "Verified" | "Pending";
+}
 
-// Detailed expenses by category
-const travelExpenses = [
-  { date: "2025-11-01", vendor: "Global Airlines", amount: 8000, status: "Flagged" as const },
-  { date: "2025-10-30", vendor: "ABC Taxi Service", amount: 2500, status: "Flagged" as const },
-  { date: "2025-10-25", vendor: "Hotel International", amount: 1200, status: "Verified" as const },
-  { date: "2025-10-20", vendor: "Rental Car XYZ", amount: 600, status: "Verified" as const }
-];
-
-const foodExpenses = [
-  { date: "2025-11-01", vendor: "Tech Solutions Inc", amount: 2450, status: "Verified" as const },
-  { date: "2025-10-28", vendor: "Office Depot", amount: 340, status: "Verified" as const },
-  { date: "2025-10-22", vendor: "Global Airlines", amount: 1800, status: "Flagged" as const },
-  { date: "2025-10-18", vendor: "Restaurant Place", amount: 450, status: "Pending" as const }
-];
-
-const officeExpenses = [
-  { date: "2025-11-01", vendor: "Tech Solutions Inc", amount: 2450, status: "Verified" as const },
-  { date: "2025-10-28", vendor: "Office Depot", amount: 340, status: "Verified" as const },
-  { date: "2025-10-22", vendor: "Global Airlines", amount: 1800, status: "Flagged" as const },
-  { date: "2025-10-18", vendor: "Restaurant Place", amount: 450, status: "Pending" as const }
-];
-
-const itExpenses = [
-  { date: "2025-11-01", vendor: "Tech Solutions Inc", amount: 2450, status: "Verified" as const },
-  { date: "2025-10-28", vendor: "Office Depot", amount: 340, status: "Verified" as const },
-  { date: "2025-10-22", vendor: "Global Airlines", amount: 1800, status: "Flagged" as const },
-  { date: "2025-10-18", vendor: "Restaurant Place", amount: 450, status: "Pending" as const }
-];
-
-const miscExpenses = [
-  { date: "2025-11-01", vendor: "Tech Solutions Inc", amount: 2450, status: "Verified" as const },
-  { date: "2025-10-28", vendor: "Office Depot", amount: 340, status: "Verified" as const },
-  { date: "2025-10-22", vendor: "Global Airlines", amount: 1800, status: "Flagged" as const },
-  { date: "2025-10-18", vendor: "Restaurant Place", amount: 450, status: "Pending" as const }
-];
-
-const categoryExpensesMap = {
-  Travel: travelExpenses,
-  Food: foodExpenses,
-  Office: officeExpenses,
-  IT: itExpenses,
-  Misc: miscExpenses
-};
+interface TrendData {
+  month: string;
+  [key: string]: string | number;
+}
 
 const statusBadges: Record<string, string> = {
   Verified: "badge green",
@@ -82,11 +35,44 @@ const categoryColors: Record<string, string> = {
   Food: "#38d788",
   Office: "#ffa94d",
   IT: "#ff6b6b",
-  Misc: "#a78bfa"
+  Misc: "#a78bfa",
+  Other: "#a78bfa"
 };
 
 export default function AllExpenses() {
-  const [activeTab, setActiveTab] = useState<keyof typeof categoryExpensesMap>("Travel");
+  const [activeTab, setActiveTab] = useState<string>("Travel");
+  const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
+  const [spendingDistribution, setSpendingDistribution] = useState<SpendingItem[]>([]);
+  const [categoryTrends, setCategoryTrends] = useState<TrendData[]>([]);
+  const [categoryExpenses, setCategoryExpenses] = useState<Record<string, CategoryExpense[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchExpenseData = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/auditor/expenses");
+        const data = await response.json();
+
+        if (data.success) {
+          setCategorySpending(data.categorySpending || []);
+          setSpendingDistribution(data.spendingDistribution || []);
+          setCategoryTrends(data.categoryTrends || []);
+          setCategoryExpenses(data.categoryExpenses || {});
+
+          const categories = data.categorySpending?.map((c: CategorySpending) => c.category) || [];
+          if (categories.length > 0) {
+            setActiveTab(categories[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching expense data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExpenseData();
+  }, []);
 
   return (
     <>
@@ -98,7 +84,7 @@ export default function AllExpenses() {
       {/* Category Spending Cards */}
       <div className="grid cols-5">
         {categorySpending.map((item) => (
-          <div key={item.category} className="stat-card" style={{ borderTop: `3px solid ${item.color}` }}>
+          <div key={item.category} className="stat-card" style={{ borderTop: `3px solid ${categoryColors[item.category] || "#a78bfa"}` }}>
             <div className="stat-label">{item.category}</div>
             <div className="stat-value">${item.amount.toLocaleString()}</div>
             <div className="stat-label">{item.change}</div>
@@ -216,15 +202,15 @@ export default function AllExpenses() {
 
         {/* Tab Navigation */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "20px", borderBottom: "1px solid var(--border-soft)" }}>
-          {Object.keys(categoryExpensesMap).map((category) => (
+          {Object.keys(categoryExpenses).map((category) => (
             <button
               key={category}
-              onClick={() => setActiveTab(category as keyof typeof categoryExpensesMap)}
+              onClick={() => setActiveTab(category)}
               style={{
                 padding: "12px 24px",
                 background: activeTab === category ? "var(--surface-sidebar-active)" : "transparent",
                 border: "none",
-                borderBottom: activeTab === category ? `2px solid ${categoryColors[category]}` : "2px solid transparent",
+                borderBottom: activeTab === category ? `2px solid ${categoryColors[category] || "#a78bfa"}` : "2px solid transparent",
                 color: activeTab === category ? "var(--text-primary)" : "var(--text-secondary)",
                 cursor: "pointer",
                 fontSize: "14px",
@@ -248,7 +234,7 @@ export default function AllExpenses() {
             </tr>
           </thead>
           <tbody>
-            {categoryExpensesMap[activeTab].map((expense, index) => (
+            {categoryExpenses[activeTab]?.map((expense, index) => (
               <tr key={`${expense.vendor}-${index}`}>
                 <td>{expense.date}</td>
                 <td>{expense.vendor}</td>
@@ -257,7 +243,13 @@ export default function AllExpenses() {
                   <span className={statusBadges[expense.status]}>{expense.status}</span>
                 </td>
               </tr>
-            ))}
+            )) || (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px" }}>
+                  No expenses found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

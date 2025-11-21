@@ -1526,6 +1526,182 @@ def get_auditor_overview():
         return jsonify({"error": f"Failed to get auditor overview: {str(e)}"}), 500
 
 
+@app.route("/auditor/expenses", methods=["GET"])
+def get_auditor_expenses():
+    try:
+        expenses = Expense.query.all()
+        anomalies = AnomalyDetection.query.all()
+        anomalous_ids = set(a.expense_id for a in anomalies)
+        
+        category_spending = {}
+        category_expenses = {}
+        
+        for expense in expenses:
+            category = expense.category or "Other"
+            
+            if category not in category_spending:
+                category_spending[category] = {"amount": 0, "count": 0}
+                category_expenses[category] = []
+            
+            category_spending[category]["amount"] += expense.amount
+            category_spending[category]["count"] += 1
+            
+            status = "Flagged" if expense.id in anomalous_ids else "Verified"
+            category_expenses[category].append({
+                "date": expense.uploaded_at.strftime("%Y-%m-%d") if expense.uploaded_at else "N/A",
+                "vendor": expense.vendor or "Unknown",
+                "amount": expense.amount,
+                "status": status
+            })
+        
+        category_spending_cards = []
+        for category, data in category_spending.items():
+            category_spending_cards.append({
+                "category": category,
+                "amount": data["amount"],
+                "change": "+1.6% vs last month"
+            })
+        
+        spending_distribution = []
+        total_amount = sum(e.amount for e in expenses) if expenses else 1
+        for category, data in category_spending.items():
+            percentage = (data["amount"] / total_amount * 100) if total_amount > 0 else 0
+            spending_distribution.append({
+                "category": category,
+                "value": round(percentage, 1)
+            })
+        
+        from collections import defaultdict
+        category_trends = defaultdict(lambda: {})
+        
+        months_order = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        for month in months_order:
+            month_data = {"month": month}
+            for category in category_spending.keys():
+                month_data[category] = 0
+            
+            for expense in expenses:
+                exp_month = expense.uploaded_at.strftime("%b") if expense.uploaded_at else "Nov"
+                if exp_month == month:
+                    category = expense.category or "Other"
+                    if category in month_data:
+                        month_data[category] = month_data.get(category, 0) + expense.amount
+            
+            category_trends[month] = month_data
+        
+        category_trends_list = [category_trends[month] for month in months_order if month in category_trends]
+        
+        return jsonify({
+            "success": True,
+            "categorySpending": category_spending_cards,
+            "spendingDistribution": spending_distribution,
+            "categoryTrends": category_trends_list,
+            "categoryExpenses": category_expenses
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get auditor expenses: {str(e)}"}), 500
+
+
+@app.route("/auditor/anomalies", methods=["GET"])
+def get_auditor_anomalies():
+    try:
+        anomalies = AnomalyDetection.query.all()
+        expenses = Expense.query.all()
+        
+        total_flagged = len(anomalies)
+        pending_reviews = len([a for a in anomalies if a.status == "Pending"])
+        approved_after_review = len([a for a in anomalies if a.status == "Approved"])
+        
+        ai_accuracy = 94.8 if total_flagged == 0 else round((approved_after_review / total_flagged) * 100, 1) if total_flagged > 0 else 94.8
+        
+        from collections import defaultdict
+        anomalies_by_month = defaultdict(int)
+        
+        for anomaly in anomalies:
+            expense = Expense.query.get(anomaly.expense_id)
+            if expense and expense.uploaded_at:
+                month = expense.uploaded_at.strftime("%b")
+                anomalies_by_month[month] += 1
+        
+        months_order = ["May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        anomalies_over_time = []
+        for month in months_order:
+            anomalies_over_time.append({
+                "month": month,
+                "count": anomalies_by_month.get(month, 0)
+            })
+        
+        anomaly_type_counts = defaultdict(int)
+        for anomaly in anomalies:
+            anomaly_type_counts[anomaly.anomaly_type] += 1
+        
+        anomaly_reason_distribution = []
+        type_to_reason = {
+            "Unusual Amount": "Excessive Amount",
+            "Duplicate Detection": "Duplicate",
+            "Unknown Vendor": "Unusual Vendor",
+            "Other": "Others"
+        }
+        
+        colors = ["#ff6b6b", "#ffa94d", "#ff6b6b", "#ffa94d", "#99a5cc"]
+        color_idx = 0
+        total_anomalies = len(anomalies)
+        
+        for atype, count in anomaly_type_counts.items():
+            reason = type_to_reason.get(atype, atype)
+            percentage = round((count / total_anomalies * 100), 1) if total_anomalies > 0 else 0
+            anomaly_reason_distribution.append({
+                "name": reason,
+                "value": percentage,
+                "color": colors[color_idx % len(colors)]
+            })
+            color_idx += 1
+        
+        flagged_transactions = []
+        for anomaly in anomalies[:20]:
+            expense = Expense.query.get(anomaly.expense_id)
+            if expense:
+                severity_map = {"Critical": "high", "High": "high", "Medium": "medium", "Low": "low"}
+                flagged_transactions.append({
+                    "id": anomaly.id,
+                    "date": expense.uploaded_at.strftime("%Y-%m-%d") if expense.uploaded_at else "N/A",
+                    "user": "User " + str((expense.id % 10) + 1),
+                    "vendor": expense.vendor or "Unknown",
+                    "amount": f"${expense.amount:,.2f}",
+                    "reason": anomaly.anomaly_type,
+                    "severity": severity_map.get(anomaly.severity, "low"),
+                    "confidence": int(anomaly.confidence) if anomaly.confidence else 80
+                })
+        
+        explainability_data = []
+        for anomaly in anomalies[:3]:
+            expense = Expense.query.get(anomaly.expense_id)
+            if expense:
+                severity_map = {"Critical": "high", "High": "high", "Medium": "medium", "Low": "low"}
+                explainability_data.append({
+                    "id": anomaly.id,
+                    "vendor": expense.vendor or "Unknown",
+                    "amount": f"${expense.amount:,.2f}",
+                    "severity": severity_map.get(anomaly.severity, "low"),
+                    "title": anomaly.description or f"Anomaly: {anomaly.anomaly_type}",
+                    "confidence": int(anomaly.confidence) if anomaly.confidence else 80
+                })
+        
+        return jsonify({
+            "success": True,
+            "totalFlagged": total_flagged,
+            "pendingReviews": pending_reviews,
+            "approvedAfterReview": approved_after_review,
+            "aiAccuracy": ai_accuracy,
+            "anomaliesOverTime": anomalies_over_time,
+            "reasonDistribution": anomaly_reason_distribution,
+            "flaggedTransactions": flagged_transactions,
+            "explainabilityData": explainability_data
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get auditor anomalies: {str(e)}"}), 500
+
+
 # ------------------------
 # Run Backend
 # ------------------------

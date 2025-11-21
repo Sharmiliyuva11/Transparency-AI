@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   AlertTriangle, 
   Clock, 
@@ -22,116 +22,36 @@ import {
 } from "recharts";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 
-// Mock data for anomalies over time
-const anomaliesOverTimeData = [
-  { month: "May", count: 9 },
-  { month: "Jun", count: 12 },
-  { month: "Jul", count: 8 },
-  { month: "Aug", count: 11 },
-  { month: "Sep", count: 7 },
-  { month: "Oct", count: 9 }
-];
+interface AnomalyOverTime {
+  month: string;
+  count: number;
+}
 
-// Mock data for anomaly reason distribution
-const reasonDistributionData = [
-  { name: "Duplicate", value: 25, color: "#ff6b6b" },
-  { name: "Excessive Amount", value: 20, color: "#ffa94d" },
-  { name: "Missing Receipt", value: 30, color: "#ff6b6b" },
-  { name: "Unusual Vendor", value: 15, color: "#ffa94d" },
-  { name: "Others", value: 10, color: "#99a5cc" }
-];
+interface ReasonDistribution {
+  name: string;
+  value: number;
+  color: string;
+}
 
-// Mock data for flagged transactions
-const flaggedTransactionsData = [
-  {
-    id: 1,
-    date: "2025-11-03",
-    user: "Mike Chen",
-    vendor: "Global Airlines",
-    amount: "$8,900",
-    reason: "Duplicate Receipt",
-    severity: "high",
-    confidence: 87
-  },
-  {
-    id: 2,
-    date: "2025-11-02",
-    user: "Sarah Johnson",
-    vendor: "ABC Taxi Service",
-    amount: "$2,500",
-    reason: "Excessive Amount",
-    severity: "medium",
-    confidence: 89
-  },
-  {
-    id: 3,
-    date: "2025-11-01",
-    user: "Robert Brown",
-    vendor: "Unknown Store XYZ",
-    amount: "$780",
-    reason: "Unusual Vendor",
-    severity: "low",
-    confidence: 76
-  },
-  {
-    id: 4,
-    date: "2025-10-31",
-    user: "Lisa Anderson",
-    vendor: "Cash Payment",
-    amount: "$1,200",
-    reason: "Missing Receipt",
-    severity: "medium",
-    confidence: 100
-  },
-  {
-    id: 5,
-    date: "2025-10-28",
-    user: "David Wilson",
-    vendor: "Restaurant XYZ",
-    amount: "$950",
-    reason: "Duplicate Receipt",
-    severity: "medium",
-    confidence: 82
-  },
-  {
-    id: 6,
-    date: "2025-10-25",
-    user: "Mike Chen",
-    vendor: "Hotel Chain",
-    amount: "$450",
-    reason: "Unusual Pattern",
-    severity: "low",
-    confidence: 71
-  }
-];
+interface FlaggedTransaction {
+  id: number;
+  date: string;
+  user: string;
+  vendor: string;
+  amount: string;
+  reason: string;
+  severity: "high" | "medium" | "low";
+  confidence: number;
+}
 
-// Mock data for AI explainability
-const explainabilityData = [
-  {
-    id: 1,
-    vendor: "Global Airlines",
-    amount: "$8,900",
-    severity: "high",
-    title: "Duplicate Receipt Detected: Two identical receipts for $8,900 were submitted on the same day by the same user. Receipt numbers match, suggesting potential double billing.",
-    confidence: 97
-  },
-  {
-    id: 2,
-    vendor: "ABC Taxi Service",
-    amount: "$2,500",
-    severity: "medium",
-    title: "Excessive Amount: This taxi amount is 3.4 standard deviations above the mean for this category ($715). The amount is unusually high, triggering our anomaly detection.",
-    confidence: 89
-  },
-  {
-    id: 3,
-    vendor: "Unknown Store XYZ",
-    amount: "$780",
-    severity: "low",
-    title: "Unusual Vendor: This vendor has not appeared in our system before. No prior transaction history exists, which may indicate a new or potentially fraudulent vendor.",
-    confidence: 76
-  }
-];
+interface ExplainabilityItem {
+  id: number;
+  vendor: string;
+  amount: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  confidence: number;
+}
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -165,7 +85,7 @@ function MetricCard({ icon, label, value, subtitle, accentClass }: MetricCardPro
 }
 
 interface ExplainabilityCardProps {
-  data: typeof explainabilityData[0];
+  data: ExplainabilityItem;
 }
 
 function ExplainabilityCard({ data }: ExplainabilityCardProps) {
@@ -243,6 +163,41 @@ function ExplainabilityCard({ data }: ExplainabilityCardProps) {
 
 export default function AnomalyDetection() {
   const [selectedScenario, setSelectedScenario] = useState("All Scenarios");
+  const [totalFlagged, setTotalFlagged] = useState(0);
+  const [pendingReviews, setPendingReviews] = useState(0);
+  const [approvedAfterReview, setApprovedAfterReview] = useState(0);
+  const [aiAccuracy, setAiAccuracy] = useState(94.8);
+  const [anomaliesOverTime, setAnomaliesOverTime] = useState<AnomalyOverTime[]>([]);
+  const [reasonDistribution, setReasonDistribution] = useState<ReasonDistribution[]>([]);
+  const [flaggedTransactions, setFlaggedTransactions] = useState<FlaggedTransaction[]>([]);
+  const [explainabilityData, setExplainabilityData] = useState<ExplainabilityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAnomalyData = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/auditor/anomalies");
+        const data = await response.json();
+
+        if (data.success) {
+          setTotalFlagged(data.totalFlagged);
+          setPendingReviews(data.pendingReviews);
+          setApprovedAfterReview(data.approvedAfterReview);
+          setAiAccuracy(data.aiAccuracy);
+          setAnomaliesOverTime(data.anomaliesOverTime || []);
+          setReasonDistribution(data.reasonDistribution || []);
+          setFlaggedTransactions(data.flaggedTransactions || []);
+          setExplainabilityData(data.explainabilityData || []);
+        }
+      } catch (error) {
+        console.error("Error fetching anomaly data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnomalyData();
+  }, []);
 
   const handleValidate = (id: number) => {
     console.log("Validate transaction:", id);
@@ -309,28 +264,28 @@ export default function AnomalyDetection() {
         <MetricCard
           icon={<AlertTriangle size={20} color="#ff6b6b" />}
           label="Total Flagged"
-          value={6}
+          value={totalFlagged}
           subtitle="This month"
           accentClass="accent-red"
         />
         <MetricCard
           icon={<Clock size={20} color="#ffa94d" />}
           label="Pending Reviews"
-          value={4}
+          value={pendingReviews}
           subtitle="Awaiting admin action"
           accentClass="accent-yellow"
         />
         <MetricCard
           icon={<CheckCircle size={20} color="#38d788" />}
           label="Approved After Review"
-          value={12}
+          value={approvedAfterReview}
           subtitle="False positives"
           accentClass="accent-green"
         />
         <MetricCard
           icon={<Target size={20} color="#3ba8ff" />}
           label="AI Accuracy"
-          value="94.8%"
+          value={`${aiAccuracy}%`}
           subtitle="Detection accuracy"
         />
       </div>
@@ -344,7 +299,7 @@ export default function AnomalyDetection() {
           </div>
           <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={anomaliesOverTimeData}>
+              <LineChart data={anomaliesOverTime}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1b2a4d" />
                 <XAxis 
                   dataKey="month" 
@@ -387,7 +342,7 @@ export default function AnomalyDetection() {
             <ResponsiveContainer>
               <PieChart>
                 <Pie
-                  data={reasonDistributionData}
+                  data={reasonDistribution}
                   dataKey="value"
                   cx="50%"
                   cy="50%"
@@ -395,7 +350,7 @@ export default function AnomalyDetection() {
                   label={({ name, value }) => `${name} ${value}%`}
                   labelLine={{ stroke: "#5870a5" }}
                 >
-                  {reasonDistributionData.map((entry, index) => (
+                  {reasonDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -437,21 +392,22 @@ export default function AnomalyDetection() {
               </tr>
             </thead>
             <tbody>
-              {flaggedTransactionsData.map((transaction) => (
-                <tr key={transaction.id}>
-                  <td>{transaction.date}</td>
-                  <td>{transaction.user}</td>
-                  <td>{transaction.vendor}</td>
-                  <td style={{ fontWeight: 600 }}>{transaction.amount}</td>
-                  <td>
-                    <span className="badge blue">{transaction.reason}</span>
-                  </td>
-                  <td>
-                    <span className={severityBadgeClass(transaction.severity)}>
-                      {transaction.severity}
-                    </span>
-                  </td>
-                  <td>{transaction.confidence}%</td>
+              {flaggedTransactions.length > 0 ? (
+                flaggedTransactions.map((transaction) => (
+                  <tr key={transaction.id}>
+                    <td>{transaction.date}</td>
+                    <td>{transaction.user}</td>
+                    <td>{transaction.vendor}</td>
+                    <td style={{ fontWeight: 600 }}>{transaction.amount}</td>
+                    <td>
+                      <span className="badge blue">{transaction.reason}</span>
+                    </td>
+                    <td>
+                      <span className={severityBadgeClass(transaction.severity)}>
+                        {transaction.severity}
+                      </span>
+                    </td>
+                    <td>{transaction.confidence}%</td>
                   <td>
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button
@@ -513,7 +469,14 @@ export default function AnomalyDetection() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px" }}>
+                    No flagged transactions found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -528,9 +491,15 @@ export default function AnomalyDetection() {
           </h3>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {explainabilityData.map((item) => (
-            <ExplainabilityCard key={item.id} data={item} />
-          ))}
+          {explainabilityData.length > 0 ? (
+            explainabilityData.map((item) => (
+              <ExplainabilityCard key={item.id} data={item} />
+            ))
+          ) : (
+            <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px" }}>
+              No explainability data available
+            </div>
+          )}
         </div>
       </div>
     </div>
