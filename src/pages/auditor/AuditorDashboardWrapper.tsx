@@ -11,7 +11,6 @@ import {
   FiShield,
   FiTrendingUp
 } from "react-icons/fi";
-import { FaRobot } from "react-icons/fa6";
 
 export default function AuditorDashboardWrapper(): ReactElement {
   return (
@@ -23,13 +22,12 @@ export default function AuditorDashboardWrapper(): ReactElement {
         { label: "Anomaly Review", icon: <FiActivity /> },
         { label: "Reports", icon: <FiBarChart2 /> },
         { label: "Audit Trail", icon: <FiLayers /> },
-        { label: "AI Insights", icon: <FaRobot /> },
-        { label: "AI Assistant", icon: <FiBookOpen /> },
+        { label: "AI Insights", icon: <FiBookOpen /> },
         { label: "Settings", icon: <FiShield /> }
       ]}
       footerLinks={[{ label: "Trends", icon: <FiTrendingUp /> }]}
       title="Auditor Dashboard"
-      subtitle="Comprehensive oversight and compliance verification"
+      subtitle="Review and monitor expense activities"
       userName="Admin User"
       userRole="Auditor"
     >

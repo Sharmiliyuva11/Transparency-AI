@@ -15,66 +15,9 @@ const adminSidebarItems: SidebarItem[] = [
   { label: 'Settings', icon: <FiSettings /> },
 ];
 
-const MOCK_EXPENSES = [
-  { 
-    id: '1', 
-    date: '2025-10-28', 
-    user: 'Sarah Johnson',
-    vendor: 'Global Airlines', 
-    amount: 5900, 
-    category: 'Travel', 
-    status: 'flagged' as const
-  },
-  { 
-    id: '2', 
-    date: '2025-10-25', 
-    user: 'Emily Davis',
-    vendor: 'Restaurant Plaza', 
-    amount: 450, 
-    category: 'Food', 
-    status: 'pending' as const
-  },
-  { 
-    id: '3', 
-    date: '2025-10-20', 
-    user: 'Emily Davis',
-    vendor: 'ABC Tax Service', 
-    amount: 2500, 
-    category: 'Travel', 
-    status: 'flagged' as const
-  },
-  { 
-    id: '4', 
-    date: '2025-10-15', 
-    user: 'Mike Chan',
-    vendor: 'Conference Center', 
-    amount: 3500, 
-    category: 'Misc', 
-    status: 'pending' as const
-  },
-];
 
-const MOCK_DEPARTMENT_DATA = [
-  { name: 'Engineering', amount: 15000 },
-  { name: 'Marketing', amount: 12000 },
-  { name: 'Sales', amount: 9000 },
-  { name: 'Operations', amount: 7000 },
-  { name: 'HR', amount: 5000 },
-];
-
-const MOCK_TREND_DATA = [
-  { month: 'May', amount: 30000 },
-  { month: 'Jun', amount: 35000 },
-  { month: 'Jul', amount: 32000 },
-  { month: 'Aug', amount: 40000 },
-  { month: 'Sep', amount: 38000 },
-  { month: 'Oct', amount: 37000 },
-];
 
 export const AdminDashboard: React.FC = () => {
-  void MOCK_EXPENSES;
-  void MOCK_DEPARTMENT_DATA;
-  void MOCK_TREND_DATA;
 
   const [activePage, setActivePage] = useState<string>('Dashboard');
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -171,102 +114,8 @@ export const AdminDashboard: React.FC = () => {
   const renderDashboardContent = (): React.ReactNode => {
     return (
       <div className="flex h-screen bg-gray-900">
-        {/* Left Side - AI Assistant */}
-        <div className="w-1/2 p-6 border-r border-gray-700">
-          <div className="bg-gray-800 rounded-lg p-6 h-full flex flex-col">
-            {/* AI Header */}
-            <div className="mb-6">
-              <div className="flex items-center mb-4">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-green-400 text-sm font-medium">Always online and ready to help</span>
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Smart Auditor AI</h2>
-              <p className="text-gray-400 text-sm">Online</p>
-            </div>
-
-            {/* Greeting */}
-            <div className="mb-6">
-              <p className="text-white text-lg">
-                Hello! I'm Smart Auditor AI, your intelligent expense assistant. I can help you with:
-              </p>
-              <ul className="text-gray-300 text-sm mt-3 space-y-1">
-                <li>• Analyzing expense patterns and trends</li>
-                <li>• Explaining flagged transactions</li>
-                <li>• Providing insights on spending optimization</li>
-                <li>• Answering questions about your financial data</li>
-                <li>• Recommending cost-saving opportunities</li>
-              </ul>
-              <p className="text-white text-lg mt-4">How can I assist you today?</p>
-            </div>
-
-            {/* Suggested Questions */}
-            <div className="mb-6">
-              <h3 className="text-white font-medium mb-3">Suggested Questions</h3>
-              <div className="space-y-2">
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  Why was the Global Airlines transaction flagged?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  What are my top spending categories?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  How can I improve my expense integrity score?
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  Explain the recent anomalies detected
-                </button>
-                <button className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors">
-                  What cost-saving opportunities are available?
-                </button>
-              </div>
-            </div>
-
-            {/* AI Capabilities */}
-            <div className="mb-6">
-              <h3 className="text-white font-medium mb-3">AI Capabilities</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Trend Analysis</h4>
-                  <p className="text-gray-400 text-xs">Identify spending patterns</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Anomaly Detection</h4>
-                  <p className="text-gray-400 text-xs">Explain flagged transactions</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Report Generation</h4>
-                  <p className="text-gray-400 text-xs">Custom insights on demand</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <h4 className="text-white text-sm font-medium">Smart Recommendations</h4>
-                  <p className="text-gray-400 text-xs">Cost-saving opportunities</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="mt-auto">
-              <h3 className="text-white font-medium mb-3">Quick Stats</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Response Time</p>
-                  <p className="text-gray-400 text-sm">&lt; 2 sec</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Accuracy Rate</p>
-                  <p className="text-gray-400 text-sm">94.8%</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-white text-lg font-semibold">Questions Answered</p>
-                  <p className="text-gray-400 text-sm">this</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side - Settings */}
-        <div className="w-1/2 p-6">
+        {/* Settings */}
+        <div className="w-full p-6">
           <div className="bg-gray-800 rounded-lg p-6 h-full overflow-y-auto">
             <h1 className="text-2xl font-semibold text-white mb-6">Settings</h1>
 

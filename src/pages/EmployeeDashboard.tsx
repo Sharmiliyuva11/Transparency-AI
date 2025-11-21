@@ -2,7 +2,6 @@ import { ReactNode, useMemo } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import { FiFileText, FiFolder, FiGrid, FiSettings, FiUploadCloud } from "react-icons/fi";
-import { FaRobot } from "react-icons/fa6";
 
 type PageConfig = {
   key: string;
@@ -37,14 +36,6 @@ const pages: PageConfig[] = [
     path: "/dashboard/employee/expenses",
     title: "Expense History",
     subtitle: "Review submissions and AI status in one place"
-  },
-  {
-    key: "assistant",
-    label: "AI Assistant",
-    icon: <FaRobot />,
-    path: "/dashboard/employee/assistant",
-    title: "Smart Auditor AI",
-    subtitle: "Conversational insights to keep your spend compliant"
   },
   {
     key: "settings",

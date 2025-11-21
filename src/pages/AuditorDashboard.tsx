@@ -3,14 +3,12 @@ import {
   FiActivity,
   FiArchive,
   FiBarChart2,
-  FiBookOpen,
   FiFileText,
   FiGrid,
   FiLayers,
   FiShield,
   FiTrendingUp
 } from "react-icons/fi";
-import { FaRobot } from "react-icons/fa6";
 import {
   Bar,
   BarChart,
@@ -75,13 +73,11 @@ export default function AuditorDashboard() {
         { label: "Anomaly Review", icon: <FiActivity /> },
         { label: "Reports", icon: <FiBarChart2 /> },
         { label: "Audit Trail", icon: <FiLayers /> },
-        { label: "AI Insights", icon: <FaRobot /> },
-        { label: "AI Assistant", icon: <FiBookOpen /> },
         { label: "Settings", icon: <FiShield /> }
       ]}
       footerLinks={[{ label: "Trends", icon: <FiTrendingUp /> }]}
       title="Auditor Dashboard"
-      subtitle="Comprehensive oversight and compliance verification"
+      subtitle="Review and monitor expense activities"
       userName="Admin User"
       userRole="Auditor"
     >
