@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Activity, 
   CheckCircle, 
@@ -8,144 +8,6 @@ import {
   Shield
 } from "lucide-react";
 import { FiChevronDown } from "react-icons/fi";
-
-// Mock data for activity log
-const activityLogData = [
-  {
-    id: 1,
-    timestamp: "2025-11-03 14:32",
-    user: "John Smith",
-    action: "Approved Expense",
-    actionType: "approved",
-    details: "Tech Solutions Inc - $2,450",
-    ipAddress: "192.168.1.100"
-  },
-  {
-    id: 2,
-    timestamp: "2025-11-03 13:15",
-    user: "Sarah Johnson",
-    action: "Uploaded Receipt",
-    actionType: "uploaded",
-    details: "Office Depot - $340",
-    ipAddress: "192.168.1.102"
-  },
-  {
-    id: 3,
-    timestamp: "2025-11-03 12:45",
-    user: "John Smith",
-    action: "Flagged as Duplicate",
-    actionType: "flagged",
-    details: "Global Airlines - $8,900",
-    ipAddress: "192.168.1.100"
-  },
-  {
-    id: 4,
-    timestamp: "2025-11-03 11:20",
-    user: "Emily Davis",
-    action: "Generated Audit Report",
-    actionType: "generated",
-    details: "October 2025 Financial Report",
-    ipAddress: "192.168.1.105"
-  },
-  {
-    id: 5,
-    timestamp: "2025-11-03 10:30",
-    user: "Mike Chen",
-    action: "Uploaded Receipt",
-    actionType: "uploaded",
-    details: "Restaurant Plaza - $450",
-    ipAddress: "192.168.1.103"
-  },
-  {
-    id: 6,
-    timestamp: "2025-11-02 16:45",
-    user: "John Smith",
-    action: "Rejected Expense",
-    actionType: "rejected",
-    details: "ABC Taxi Service - $2,500",
-    ipAddress: "192.168.1.100"
-  },
-  {
-    id: 7,
-    timestamp: "2025-11-02 15:30",
-    user: "Robert Brown",
-    action: "Uploaded Receipt",
-    actionType: "uploaded",
-    details: "Cloud Services Ltd - $1,200",
-    ipAddress: "192.168.1.104"
-  },
-  {
-    id: 8,
-    timestamp: "2025-11-02 14:15",
-    user: "John Smith",
-    action: "Returned Expense",
-    actionType: "returned",
-    details: "Changed Value Chen to User",
-    ipAddress: "192.168.1.100"
-  },
-  {
-    id: 9,
-    timestamp: "2025-11-02 13:00",
-    user: "Emily Davis",
-    action: "Rejected Docs",
-    actionType: "rejected",
-    details: "Q3 Compliance Report CSV",
-    ipAddress: "192.168.1.105"
-  },
-  {
-    id: 10,
-    timestamp: "2025-11-02 11:45",
-    user: "Sarah Johnson",
-    action: "Edited Expense",
-    actionType: "edited",
-    details: "Updated vendor name for $340 expense",
-    ipAddress: "192.168.1.102"
-  }
-];
-
-// Mock data for recent activity timeline
-const recentActivityData = [
-  {
-    id: 1,
-    user: "John Smith",
-    action: "Approved Expense",
-    actionType: "approved",
-    details: "Tech Solutions Inc - $2,450",
-    timestamp: "2025-11-03 14:32"
-  },
-  {
-    id: 2,
-    user: "Sarah Johnson",
-    action: "Uploaded Receipt",
-    actionType: "uploaded",
-    details: "Office Depot - $340",
-    timestamp: "2025-11-03 13:15"
-  },
-  {
-    id: 3,
-    user: "John Smith",
-    action: "Flagged as Duplicate",
-    actionType: "flagged",
-    details: "Global Airlines - $8,900",
-    timestamp: "2025-11-03 12:45"
-  },
-  {
-    id: 4,
-    user: "Emily Davis",
-    action: "Generated Audit Report",
-    actionType: "generated",
-    details: "October 2025 Financial Report",
-    timestamp: "2025-11-03 11:20"
-  },
-  {
-    id: 5,
-    user: "Mike Chen",
-    action: "Uploaded Receipt",
-    actionType: "uploaded",
-    details: "Restaurant Plaza - $450",
-    timestamp: "2025-11-03 10:30"
-  }
-];
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -177,8 +39,17 @@ function MetricCard({ icon, label, value, subtitle }: MetricCardProps) {
   );
 }
 
+interface ActivityItem {
+  id: number;
+  user: string;
+  action: string;
+  actionType: string;
+  details: string;
+  timestamp: string;
+}
+
 interface TimelineItemProps {
-  data: typeof recentActivityData[0];
+  data: ActivityItem;
 }
 
 function TimelineItem({ data }: TimelineItemProps) {
@@ -249,6 +120,43 @@ function TimelineItem({ data }: TimelineItemProps) {
 export default function AuditTrail() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All Actions");
+  const [activityLogData, setActivityLogData] = useState<any[]>([]);
+  const [recentActivityData, setRecentActivityData] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({
+    totalActivities: 0,
+    actionCounts: {},
+    recentActivities: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [logsRes, statsRes] = await Promise.all([
+          fetch("http://127.0.0.1:5000/activity-logs?limit=100"),
+          fetch("http://127.0.0.1:5000/activity-logs/stats")
+        ]);
+
+        const logsData = await logsRes.json();
+        const statsData = await statsRes.json();
+
+        if (logsData.success) {
+          setActivityLogData(logsData.activities || []);
+          setRecentActivityData(logsData.activities?.slice(0, 5) || []);
+        }
+
+        if (statsData.success) {
+          setStats(statsData);
+        }
+      } catch (error) {
+        console.error("Error fetching audit trail data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const getActionBadgeClass = (actionType: string): string => {
     const classes: Record<string, string> = {
@@ -263,6 +171,48 @@ export default function AuditTrail() {
     return classes[actionType] || "badge blue";
   };
 
+  const approvalCount = stats.approvals || 0;
+  const flagCount = stats.flagsRejections || 0;
+  const reportCount = stats.reportsGenerated || 0;
+
+  const getFilterActionTypes = (filter: string): string[] => {
+    const filterMap: Record<string, string[]> = {
+      "All Actions": [],
+      "Approved Expenses": ["approved"],
+      "Uploaded Receipts": ["uploaded"],
+      "Flagged Items": ["flagged"],
+      "Rejected Items": ["rejected"],
+      "Generated Reports": ["generated"]
+    };
+    return filterMap[filter] || [];
+  };
+
+  const filteredActivityData = activityLogData.filter((activity) => {
+    const actionTypes = getFilterActionTypes(selectedFilter);
+    
+    const matchesFilter = actionTypes.length === 0 || actionTypes.includes(activity.actionType);
+    const matchesSearch = 
+      searchQuery === "" ||
+      activity.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      activity.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      activity.details.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesFilter && matchesSearch;
+  });
+
+  const filteredRecentActivity = recentActivityData.filter((activity) => {
+    const actionTypes = getFilterActionTypes(selectedFilter);
+    
+    const matchesFilter = actionTypes.length === 0 || actionTypes.includes(activity.actionType);
+    const matchesSearch = 
+      searchQuery === "" ||
+      activity.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      activity.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      activity.details.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesFilter && matchesSearch;
+  });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
       {/* Metric Cards */}
@@ -270,25 +220,25 @@ export default function AuditTrail() {
         <MetricCard
           icon={<Activity size={20} color="#3ba8ff" />}
           label="Total Activities"
-          value={10}
+          value={stats.totalActivities || 0}
           subtitle="Last 30 days"
         />
         <MetricCard
           icon={<CheckCircle size={20} color="#38d788" />}
           label="Approvals"
-          value={1}
+          value={approvalCount}
           subtitle="Actions completed"
         />
         <MetricCard
           icon={<Flag size={20} color="#ff6b6b" />}
           label="Flags/Rejections"
-          value={2}
+          value={flagCount}
           subtitle="Issues actions"
         />
         <MetricCard
           icon={<FileText size={20} color="#3ba8ff" />}
           label="Reports Generated"
-          value={2}
+          value={reportCount}
           subtitle="Last 7 reports"
         />
       </div>
@@ -350,7 +300,7 @@ export default function AuditTrail() {
       {/* Activity Log Table */}
       <div className="section-card">
         <div className="section-header">
-          <h3>Activity Log (10 entries)</h3>
+          <h3>Activity Log ({filteredActivityData.length} entries)</h3>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table className="table">
@@ -364,23 +314,31 @@ export default function AuditTrail() {
               </tr>
             </thead>
             <tbody>
-              {activityLogData.map((activity) => (
-                <tr key={activity.id}>
-                  <td style={{ fontSize: "13px" }}>{activity.timestamp}</td>
-                  <td>{activity.user}</td>
-                  <td>
-                    <span className={getActionBadgeClass(activity.actionType)}>
-                      {activity.action}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                    {activity.details}
-                  </td>
-                  <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                    {activity.ipAddress}
+              {filteredActivityData.length > 0 ? (
+                filteredActivityData.map((activity) => (
+                  <tr key={activity.id}>
+                    <td style={{ fontSize: "13px" }}>{activity.timestamp}</td>
+                    <td>{activity.user}</td>
+                    <td>
+                      <span className={getActionBadgeClass(activity.actionType)}>
+                        {activity.action}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+                      {activity.details}
+                    </td>
+                    <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+                      {activity.ipAddress}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px" }}>
+                    No activities found matching your filter
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -395,22 +353,30 @@ export default function AuditTrail() {
           position: "relative",
           paddingLeft: "8px"
         }}>
-          {/* Vertical line */}
-          <div style={{
-            position: "absolute",
-            left: "14px",
-            top: "12px",
-            bottom: "24px",
-            width: "2px",
-            background: "var(--border-soft)"
-          }} />
-          
-          {/* Timeline items */}
-          <div style={{ position: "relative" }}>
-            {recentActivityData.map((item) => (
-              <TimelineItem key={item.id} data={item} />
-            ))}
-          </div>
+          {filteredRecentActivity.length > 0 ? (
+            <>
+              {/* Vertical line */}
+              <div style={{
+                position: "absolute",
+                left: "14px",
+                top: "12px",
+                bottom: "24px",
+                width: "2px",
+                background: "var(--border-soft)"
+              }} />
+              
+              {/* Timeline items */}
+              <div style={{ position: "relative" }}>
+                {filteredRecentActivity.map((item) => (
+                  <TimelineItem key={item.id} data={item} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px" }}>
+              No recent activities found matching your filter
+            </div>
+          )}
         </div>
       </div>
 

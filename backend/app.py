@@ -1,5 +1,5 @@
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import re
 from typing import Dict
@@ -164,6 +164,29 @@ class AnomalyDetection(db.Model):
             "description": self.description,
             "detectedAt": self.detected_at.isoformat() + "Z" if self.detected_at else None,
             "status": self.status
+        }
+
+
+class ActivityLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.Column(db.String(255), nullable=False)
+    action = db.Column(db.String(100), nullable=False)
+    action_type = db.Column(db.String(50), nullable=False)
+    details = db.Column(db.Text)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expense.id'))
+    ip_address = db.Column(db.String(50))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M") if self.timestamp else None,
+            "user": self.user,
+            "action": self.action,
+            "actionType": self.action_type,
+            "details": self.details,
+            "expenseId": self.expense_id,
+            "ipAddress": self.ip_address
         }
 
 
@@ -397,6 +420,18 @@ def detect_anomalies(expense_id: int, amount: float, vendor: str, category: str,
         
         if anomalies:
             db.session.commit()
+            
+            for anomaly in anomalies:
+                activity = ActivityLog(
+                    user="System",
+                    action="Anomaly Detected",
+                    action_type="flagged",
+                    details=f"{anomaly.anomaly_type}: {anomaly.description}",
+                    expense_id=expense_id,
+                    ip_address="system"
+                )
+                db.session.add(activity)
+            db.session.commit()
     
     except Exception as e:
         print(f"Error detecting anomalies: {str(e)}")
@@ -440,6 +475,17 @@ def ocr():
         )
 
         db.session.add(expense)
+        db.session.commit()
+
+        activity = ActivityLog(
+            user=request.headers.get('X-User-Name', 'Unknown User'),
+            action="Uploaded Receipt",
+            action_type="uploaded",
+            details=f"{entities['vendor']} - ${entities['total']}",
+            expense_id=expense.id,
+            ip_address=request.remote_addr
+        )
+        db.session.add(activity)
         db.session.commit()
 
         detect_anomalies(expense.id, entities["total"], entities["vendor"], category, expense.uploaded_at)
@@ -1302,6 +1348,182 @@ def migrate_database():
     except Exception as e:
         print("Migration skipped:", e)
         db.session.rollback()
+
+
+# ------------------------
+# Audit Trail & Activity Logs
+# ------------------------
+@app.route("/activity-logs", methods=["GET"])
+def get_activity_logs():
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        activities = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(limit).offset(offset).all()
+        total = ActivityLog.query.count()
+        
+        return jsonify({
+            "success": True,
+            "activities": [a.to_dict() for a in activities],
+            "total": total,
+            "count": len(activities)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get activity logs: {str(e)}"}), 500
+
+
+@app.route("/activity-logs/stats", methods=["GET"])
+def get_activity_stats():
+    try:
+        now = datetime.utcnow()
+        thirty_days_ago = now - timedelta(days=30)
+        seven_days_ago = now - timedelta(days=7)
+        
+        all_activities = ActivityLog.query.all()
+        activities_30d = ActivityLog.query.filter(ActivityLog.timestamp >= thirty_days_ago).all()
+        activities_7d = ActivityLog.query.filter(ActivityLog.timestamp >= seven_days_ago).all()
+        
+        action_counts = {}
+        for activity in all_activities:
+            action = activity.action
+            action_counts[action] = action_counts.get(action, 0) + 1
+        
+        action_type_counts = {}
+        for activity in activities_30d:
+            action_type = activity.action_type
+            action_type_counts[action_type] = action_type_counts.get(action_type, 0) + 1
+        
+        approvals = action_type_counts.get("approved", 0)
+        flags = action_type_counts.get("flagged", 0) + action_type_counts.get("rejected", 0)
+        reports = action_type_counts.get("generated", 0)
+        uploads = action_type_counts.get("uploaded", 0)
+        
+        recent_activities = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(5).all()
+        
+        return jsonify({
+            "success": True,
+            "totalActivities": len(activities_30d),
+            "last30Days": len(activities_30d),
+            "approvals": approvals,
+            "flagsRejections": flags,
+            "reportsGenerated": reports,
+            "uploads": uploads,
+            "last7Reports": len([a for a in activities_7d if a.action_type == "generated"]),
+            "actionCounts": action_counts,
+            "actionTypeCounts": action_type_counts,
+            "recentActivities": [a.to_dict() for a in recent_activities]
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get activity stats: {str(e)}"}), 500
+
+
+@app.route("/audit-trail", methods=["GET"])
+def get_audit_trail():
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        
+        activities = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(limit).all()
+        
+        audit_trail = []
+        for activity in activities:
+            audit_trail.append({
+                "id": activity.id,
+                "title": activity.user,
+                "action": activity.action,
+                "detail": activity.details,
+                "timestamp": activity.timestamp.strftime("%Y-%m-%d %H:%M - %I:%M %p") if activity.timestamp else None,
+                "ipAddress": activity.ip_address,
+                "actionType": activity.action_type
+            })
+        
+        return jsonify({
+            "success": True,
+            "auditTrail": audit_trail,
+            "count": len(audit_trail)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get audit trail: {str(e)}"}), 500
+
+
+@app.route("/dashboard/auditor-overview", methods=["GET"])
+def get_auditor_overview():
+    try:
+        expenses = Expense.query.all()
+        anomalies = AnomalyDetection.query.all()
+        activities = ActivityLog.query.all()
+        
+        total_transactions = len(expenses)
+        total_amount = sum(e.amount for e in expenses)
+        
+        anomalous_ids = set(a.expense_id for a in anomalies)
+        flagged_count = len(anomalous_ids)
+        
+        compliance_violations = len([a for a in anomalies if a.severity in ["Critical", "High"]])
+        
+        compliance_rate = ((total_transactions - compliance_violations) / total_transactions * 100) if total_transactions > 0 else 0
+        
+        compliance_data = {
+            "compliant": 100 - (compliance_violations / total_transactions * 100) if total_transactions > 0 else 100,
+            "warning": 0,
+            "violation": compliance_violations / total_transactions * 100 if total_transactions > 0 else 0
+        }
+        
+        from collections import defaultdict
+        monthly_data = defaultdict(lambda: {"verified": 0, "flagged": 0})
+        
+        for expense in expenses:
+            month_year = expense.uploaded_at.strftime("%b") if expense.uploaded_at else "Nov"
+            if expense.id in anomalous_ids:
+                monthly_data[month_year]["flagged"] += 1
+            else:
+                monthly_data[month_year]["verified"] += 1
+        
+        review_stats = []
+        months_order = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        for month in months_order:
+            if month in monthly_data:
+                review_stats.append({
+                    "month": month,
+                    "verified": monthly_data[month]["verified"],
+                    "flagged": monthly_data[month]["flagged"]
+                })
+        
+        transactions_data = []
+        for expense in expenses[:20]:
+            status = "Flagged" if expense.id in anomalous_ids else "Verified" if expense.status == "Processed" else "Pending"
+            transactions_data.append({
+                "date": expense.uploaded_at.strftime("%Y-%m-%d") if expense.uploaded_at else "N/A",
+                "user": "User " + str((expense.id % 10) + 1),
+                "vendor": expense.vendor or "Unknown",
+                "amount": f"${expense.amount}",
+                "category": expense.category or "Other",
+                "status": status,
+                "aiFlag": "Flagged" if expense.id in anomalous_ids else "Clean"
+            })
+        
+        recent_audit_trail = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(3).all()
+        audit_trail_data = []
+        for activity in recent_audit_trail:
+            audit_trail_data.append({
+                "title": activity.user,
+                "action": activity.action,
+                "detail": activity.details,
+                "timestamp": activity.timestamp.strftime("%Y-%m-%d %H:%M - %I:%M %p") if activity.timestamp else None
+            })
+        
+        return jsonify({
+            "success": True,
+            "totalTransactions": total_transactions,
+            "complianceRate": round(compliance_rate, 1),
+            "aiReviewedFlags": flagged_count,
+            "policyViolations": compliance_violations,
+            "complianceData": compliance_data,
+            "reviewStats": review_stats,
+            "transactions": transactions_data,
+            "auditTrail": audit_trail_data
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get auditor overview: {str(e)}"}), 500
 
 
 # ------------------------

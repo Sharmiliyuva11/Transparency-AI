@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Bar,
   BarChart,
@@ -11,36 +12,6 @@ import {
   YAxis
 } from "recharts";
 
-const complianceData = [
-  { name: "Compliant", value: 91, color: "#38d788" },
-  { name: "Warning", value: 7, color: "#ffa94d" },
-  { name: "Violation", value: 2, color: "#ff6b6b" }
-];
-
-const reviewStats = [
-  { month: "Jul", verified: 58, flagged: 6 },
-  { month: "Aug", verified: 54, flagged: 4 },
-  { month: "Sep", verified: 52, flagged: 5 },
-  { month: "Oct", verified: 57, flagged: 3 }
-];
-
-const transactions = [
-  { date: "2025-11-01", user: "User 1", vendor: "Tech Solutions Inc", amount: "$2,450", category: "IT", status: "Verified", aiFlag: "Clean" },
-  { date: "2025-10-30", user: "User 2", vendor: "Office Depot", amount: "$340", category: "Office", status: "Verified", aiFlag: "Clean" },
-  { date: "2025-10-28", user: "User 3", vendor: "Global Airlines", amount: "$1,800", category: "Travel", status: "Flagged", aiFlag: "Flagged" },
-  { date: "2025-10-25", user: "User 4", vendor: "Restaurant Place", amount: "$450", category: "Food", status: "Pending", aiFlag: "Clean" },
-  { date: "2025-10-22", user: "User 5", vendor: "Cloud Services Ltd", amount: "$1,200", category: "IT", status: "Verified", aiFlag: "Clean" },
-  { date: "2025-10-21", user: "User 6", vendor: "ABC Taxi Service", amount: "$250", category: "Travel", status: "Flagged", aiFlag: "Flagged" },
-  { date: "2025-10-18", user: "User 7", vendor: "Stationery World", amount: "$180", category: "Office", status: "Verified", aiFlag: "Clean" },
-  { date: "2025-10-15", user: "User 8", vendor: "Conference Center", amount: "$5,600", category: "Misc", status: "Pending", aiFlag: "Clean" }
-];
-
-const auditTrail = [
-  { title: "John Smith", action: "Approved Reports", detail: "Tech Solutions Inc - $2,450", timestamp: "2025-10-15 14:32 - 192.168.1.100" },
-  { title: "Sarah Johnson", action: "Uploaded Receipt", detail: "Office Depot - $340", timestamp: "2025-10-15 13:48 - 192.168.1.202" },
-  { title: "John Smith", action: "Flagged as Duplicate", detail: "Global Airlines - $1,800", timestamp: "2025-10-14 19:05 - 192.168.1.100" }
-];
-
 const statusBadges: Record<string, string> = {
   Verified: "badge green",
   Pending: "badge yellow",
@@ -53,6 +24,45 @@ const flagBadges: Record<string, string> = {
 };
 
 export default function AuditorOverview() {
+  const [overviewData, setOverviewData] = useState<any>({
+    totalTransactions: 0,
+    complianceRate: 0,
+    aiReviewedFlags: 0,
+    policyViolations: 0,
+    complianceData: { compliant: 100, warning: 0, violation: 0 },
+    reviewStats: [],
+    transactions: [],
+    auditTrail: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/dashboard/auditor-overview");
+        const data = await response.json();
+        
+        if (data.success) {
+          setOverviewData(data);
+        }
+      } catch (error) {
+        console.error("Error fetching auditor overview:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const complianceChartData = overviewData.complianceData 
+    ? [
+        { name: "Compliant", value: Math.round(overviewData.complianceData.compliant), color: "#38d788" },
+        ...(overviewData.complianceData.warning > 0 ? [{ name: "Warning", value: Math.round(overviewData.complianceData.warning), color: "#ffa94d" }] : []),
+        ...(overviewData.complianceData.violation > 0 ? [{ name: "Violation", value: Math.round(overviewData.complianceData.violation), color: "#ff6b6b" }] : [])
+      ]
+    : [];
+
   return (
     <>
       <div style={{ marginBottom: "12px" }}>
@@ -62,22 +72,22 @@ export default function AuditorOverview() {
       <div className="grid cols-4">
         <div className="stat-card">
           <div className="stat-label">Total Transactions</div>
-          <div className="stat-value">172</div>
+          <div className="stat-value">{overviewData.totalTransactions}</div>
           <div className="stat-label">This audit period</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Compliance Rate</div>
-          <div className="stat-value">90.7%</div>
-          <div className="stat-label">+2.1% improvement</div>
+          <div className="stat-value">{overviewData.complianceRate.toFixed(1)}%</div>
+          <div className="stat-label">Current status</div>
         </div>
         <div className="stat-card accent-green">
           <div className="stat-label">AI Flags Reviewed</div>
-          <div className="stat-value">16</div>
+          <div className="stat-value">{overviewData.aiReviewedFlags}</div>
           <div className="stat-label">Anomalies verified</div>
         </div>
         <div className="stat-card accent-red">
           <div className="stat-label">Policy Violations</div>
-          <div className="stat-value">4</div>
+          <div className="stat-value">{overviewData.policyViolations}</div>
           <div className="stat-label">Require attention</div>
         </div>
       </div>
@@ -89,8 +99,8 @@ export default function AuditorOverview() {
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={complianceData} dataKey="value" innerRadius={70} outerRadius={100} paddingAngle={4}>
-                  {complianceData.map((item) => (
+                <Pie data={complianceChartData} dataKey="value" innerRadius={70} outerRadius={100} paddingAngle={4}>
+                  {complianceChartData.map((item) => (
                     <Cell key={item.name} fill={item.color} />
                   ))}
                 </Pie>
@@ -103,7 +113,7 @@ export default function AuditorOverview() {
             </ResponsiveContainer>
           </div>
           <div className="grid cols-3">
-            {complianceData.map((item) => (
+            {complianceChartData.map((item) => (
               <div key={item.name} className="stat-label">
                 <span className="badge blue" style={{ background: `${item.color}33`, color: item.color }}>
                   {item.value}%
@@ -119,7 +129,7 @@ export default function AuditorOverview() {
           </div>
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer>
-              <BarChart data={reviewStats}>
+              <BarChart data={overviewData.reviewStats || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1b2a4d" />
                 <XAxis dataKey="month" stroke="#5870a5" />
                 <YAxis stroke="#5870a5" />
@@ -152,7 +162,7 @@ export default function AuditorOverview() {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((txn) => (
+            {(overviewData.transactions || []).map((txn: any) => (
               <tr key={txn.vendor + txn.date}>
                 <td>{txn.date}</td>
                 <td>{txn.user}</td>
@@ -177,7 +187,7 @@ export default function AuditorOverview() {
           <h3>Recent Audit Trail Activity</h3>
         </div>
         <div className="audit-feed">
-          {auditTrail.map((entry) => (
+          {(overviewData.auditTrail || []).map((entry: any) => (
             <div key={entry.timestamp} className="audit-item">
               <strong>{entry.title}</strong>
               <span>{entry.action}</span>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { FiHome, FiSearch, FiSettings, FiBarChart } from 'react-icons/fi';
 import { AlertTriangle, Clock, CheckCircle, Target } from 'lucide-react';
@@ -12,136 +12,125 @@ const auditorSidebarItems: SidebarItem[] = [
   { label: 'Settings', icon: <FiSettings /> },
 ];
 
-// Mock data for stats cards
-const STATS_DATA = [
-  {
-    title: 'Total Flagged',
-    value: '6',
-    subtitle: 'This month',
-    icon: AlertTriangle,
-    bgColor: 'bg-red-500/10',
-    iconColor: 'text-red-500',
-    borderColor: 'border-red-500/20',
-  },
-  {
-    title: 'Pending Reviews',
-    value: '4',
-    subtitle: 'Awaiting admin action',
-    icon: Clock,
-    bgColor: 'bg-yellow-500/10',
-    iconColor: 'text-yellow-500',
-    borderColor: 'border-yellow-500/20',
-  },
-  {
-    title: 'Approved After Review',
-    value: '12',
-    subtitle: 'False positives',
-    icon: CheckCircle,
-    bgColor: 'bg-green-500/10',
-    iconColor: 'text-green-500',
-    borderColor: 'border-green-500/20',
-  },
-  {
-    title: 'AI Accuracy',
-    value: '94.8%',
-    subtitle: 'Detection accuracy',
-    icon: Target,
-    bgColor: 'bg-blue-500/10',
-    iconColor: 'text-blue-500',
-    borderColor: 'border-blue-500/20',
-  },
-];
-
-// Mock data for line chart
-const ANOMALIES_OVER_TIME = [
-  { month: 'May', count: 9 },
-  { month: 'Jun', count: 12 },
-  { month: 'Jul', count: 7 },
-  { month: 'Aug', count: 10 },
-  { month: 'Sep', count: 6 },
-  { month: 'Oct', count: 8 },
-];
-
-// Mock data for pie chart
-const ANOMALY_REASONS = [
-  { name: 'Duplicate Receipt', value: 40, color: '#ef4444' },
-  { name: 'Excessive Amount', value: 20, color: '#f97316' },
-  { name: 'Unusual Vendor', value: 15, color: '#94a3b8' },
-  { name: 'Missing Receipt', value: 10, color: '#eab308' },
-  { name: 'Others', value: 10, color: '#64748b' },
-];
-
-// Mock data for flagged transactions
-const FLAGGED_TRANSACTIONS = [
-  {
-    date: '2025-11-03',
-    user: 'Mike Chan',
-    vendor: 'Global Airlines',
-    amount: '$8,000',
-    reason: 'Duplicate Receipt',
-    reasonColor: 'bg-red-500/20 text-red-400 border-red-500/30',
-    severity: 'high',
-    severityColor: 'bg-red-500/20 text-red-400',
-    confidence: '97%',
-  },
-  {
-    date: '2025-11-02',
-    user: 'Sarah Johnson',
-    vendor: 'ABC Taxi Service',
-    amount: '$2,500',
-    reason: 'Excessive Amount',
-    reasonColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    severity: 'medium',
-    severityColor: 'bg-yellow-500/20 text-yellow-400',
-    confidence: '89%',
-  },
-  {
-    date: '2025-11-01',
-    user: 'Robert Brown',
-    vendor: 'Unknown Store XYZ',
-    amount: '$780',
-    reason: 'Unusual Vendor',
-    reasonColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    severity: 'low',
-    severityColor: 'bg-blue-500/20 text-blue-400',
-    confidence: '76%',
-  },
-  {
-    date: '2025-10-30',
-    user: 'Lisa Anderson',
-    vendor: 'Cash Payment',
-    amount: '$1,200',
-    reason: 'Missing Receipt',
-    reasonColor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    severity: 'high',
-    severityColor: 'bg-red-500/20 text-red-400',
-    confidence: '100%',
-  },
-  {
-    date: '2025-10-28',
-    user: 'David Wilson',
-    vendor: 'Restaurant XYZ',
-    amount: '$950',
-    reason: 'Date Mismatch',
-    reasonColor: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    severity: 'medium',
-    severityColor: 'bg-yellow-500/20 text-yellow-400',
-    confidence: '82%',
-  },
-  {
-    date: '2025-10-25',
-    user: 'Mike Chan',
-    vendor: 'Hotel Chain',
-    amount: '$450',
-    reason: 'Unusual Pattern',
-    reasonColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
-    severity: 'low',
-    severityColor: 'bg-blue-500/20 text-blue-400',
-    confidence: '71%',
-  },
-];
-
 export const AuditorDashboard: React.FC = () => {
+  const [dashboardData, setDashboardData] = useState<any>({
+    totalCharges: 0,
+    anomalousTransactions: 0,
+    flaggedExpenses: 0,
+    detectionAccuracy: 0,
+    severityCounts: { Critical: 0, High: 0, Medium: 0, Low: 0 },
+    anomalyTypes: {},
+    averageConfidence: 0
+  });
+  const [anomalies, setAnomalies] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsRes, anomaliesRes] = await Promise.all([
+          fetch('http://127.0.0.1:5000/anomalies/stats'),
+          fetch('http://127.0.0.1:5000/anomalies')
+        ]);
+
+        const statsData = await statsRes.json();
+        const anomaliesData = await anomaliesRes.json();
+
+        if (statsData.success) {
+          setDashboardData(statsData);
+        }
+
+        if (anomaliesData.success) {
+          setAnomalies(anomaliesData.anomalies || []);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const STATS_DATA = [
+    {
+      title: 'Total Flagged',
+      value: dashboardData.flaggedExpenses?.toString() || '0',
+      subtitle: 'This month',
+      icon: AlertTriangle,
+      bgColor: 'bg-red-500/10',
+      iconColor: 'text-red-500',
+      borderColor: 'border-red-500/20',
+    },
+    {
+      title: 'Pending Reviews',
+      value: dashboardData.severityCounts?.High?.toString() || '0',
+      subtitle: 'Awaiting admin action',
+      icon: Clock,
+      bgColor: 'bg-yellow-500/10',
+      iconColor: 'text-yellow-500',
+      borderColor: 'border-yellow-500/20',
+    },
+    {
+      title: 'Critical Issues',
+      value: dashboardData.severityCounts?.Critical?.toString() || '0',
+      subtitle: 'Require immediate attention',
+      icon: CheckCircle,
+      bgColor: 'bg-green-500/10',
+      iconColor: 'text-green-500',
+      borderColor: 'border-green-500/20',
+    },
+    {
+      title: 'AI Accuracy',
+      value: dashboardData.detectionAccuracy?.toFixed(1) + '%' || '0%',
+      subtitle: 'Detection accuracy',
+      icon: Target,
+      bgColor: 'bg-blue-500/10',
+      iconColor: 'text-blue-500',
+      borderColor: 'border-blue-500/20',
+    },
+  ];
+
+  const anomalyTypeStats = Object.entries(dashboardData.anomalyTypes || {}).map(([name, count]) => ({
+    name,
+    value: (count as number),
+    color: ['#ef4444', '#f97316', '#94a3b8', '#eab308', '#64748b'][Object.keys(dashboardData.anomalyTypes || {}).indexOf(name) % 5]
+  }));
+
+  const ANOMALIES_OVER_TIME = [
+    { month: 'May', count: 9 },
+    { month: 'Jun', count: 12 },
+    { month: 'Jul', count: 7 },
+    { month: 'Aug', count: 10 },
+    { month: 'Sep', count: 6 },
+    { month: 'Oct', count: 8 },
+  ];
+
+  const flaggedTransactions = anomalies.slice(0, 6).map((anomaly: any) => ({
+    date: anomaly.dateTime?.split('T')[0] || 'N/A',
+    user: 'User ' + ((anomaly.expenseId || 1) % 10 + 1),
+    vendor: anomaly.vendorName || 'Unknown',
+    amount: '$' + (anomaly.amount || 0).toFixed(2),
+    reason: anomaly.anomalyType,
+    reasonColor: getSeverityColor(anomaly.severity, 'reason'),
+    severity: anomaly.severity?.toLowerCase() || 'low',
+    severityColor: getSeverityColor(anomaly.severity, 'badge'),
+    confidence: Math.round(anomaly.confidence || 0) + '%',
+  }));
+
+  function getSeverityColor(severity: string, type: 'reason' | 'badge') {
+    const severityUpper = severity?.toUpperCase() || '';
+    if (type === 'reason') {
+      if (severityUpper === 'CRITICAL' || severityUpper === 'HIGH') return 'bg-red-500/20 text-red-400 border-red-500/30';
+      if (severityUpper === 'MEDIUM') return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    } else {
+      if (severityUpper === 'CRITICAL' || severityUpper === 'HIGH') return 'bg-red-500/20 text-red-400';
+      if (severityUpper === 'MEDIUM') return 'bg-yellow-500/20 text-yellow-400';
+      return 'bg-blue-500/20 text-blue-400';
+    }
+  }
+
+  const topAnomaly = anomalies[0];
+
   return (
     <DashboardLayout
       role="Auditor"
@@ -222,7 +211,7 @@ export const AuditorDashboard: React.FC = () => {
               <ResponsiveContainer width="50%" height={300}>
                 <PieChart>
                   <Pie
-                    data={ANOMALY_REASONS}
+                    data={anomalyTypeStats}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -230,7 +219,7 @@ export const AuditorDashboard: React.FC = () => {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {ANOMALY_REASONS.map((entry, index) => (
+                    {anomalyTypeStats.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -245,7 +234,7 @@ export const AuditorDashboard: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-3">
-                {ANOMALY_REASONS.map((reason, index) => (
+                {anomalyTypeStats.map((reason, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
@@ -254,7 +243,7 @@ export const AuditorDashboard: React.FC = () => {
                       />
                       <span className="text-sm text-gray-300">{reason.name}</span>
                     </div>
-                    <span className="text-sm font-medium text-white">{reason.value}%</span>
+                    <span className="text-sm font-medium text-white">{reason.value}</span>
                   </div>
                 ))}
               </div>
@@ -283,7 +272,7 @@ export const AuditorDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {FLAGGED_TRANSACTIONS.map((transaction, index) => (
+                {flaggedTransactions.map((transaction, index) => (
                   <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                     <td className="py-3 px-4 text-sm text-gray-300">{transaction.date}</td>
                     <td className="py-3 px-4 text-sm text-gray-300">{transaction.user}</td>
@@ -322,34 +311,36 @@ export const AuditorDashboard: React.FC = () => {
         </div>
 
         {/* AI Explainability Section */}
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-base font-semibold text-white">AI Explainability - Recent Flags</h3>
-                <span className="text-xs font-medium text-red-400 bg-red-500/20 px-2 py-1 rounded">HIGH</span>
-              </div>
-              <p className="text-sm text-gray-300 mb-3">
-                <span className="font-medium text-white">Global Airlines - $8,000</span>
-              </p>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                <span className="font-medium text-red-400">Duplicate Receipt Detected:</span> Two identical receipts for $8,000 were submitted on the same day by the same user. Receipt numbers match, suggesting potential double-billing.
-              </p>
-              <div className="mt-3 pt-3 border-t border-red-500/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Confidence Level</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-500" style={{ width: '97%' }} />
+        {topAnomaly && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold text-white">AI Explainability - Recent Flags</h3>
+                  <span className="text-xs font-medium text-red-400 bg-red-500/20 px-2 py-1 rounded">{topAnomaly.severity?.toUpperCase() || 'HIGH'}</span>
+                </div>
+                <p className="text-sm text-gray-300 mb-3">
+                  <span className="font-medium text-white">{topAnomaly.vendorName || 'Unknown Vendor'} - ${topAnomaly.amount || 0}</span>
+                </p>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  <span className="font-medium text-red-400">{topAnomaly.anomalyType}:</span> {topAnomaly.description || 'This transaction has been flagged by the AI detection system.'}
+                </p>
+                <div className="mt-3 pt-3 border-t border-red-500/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Confidence Level</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-500" style={{ width: Math.round(topAnomaly.confidence || 0) + '%' }} />
+                      </div>
+                      <span className="text-xs font-medium text-white">{Math.round(topAnomaly.confidence || 0)}% confidence</span>
                     </div>
-                    <span className="text-xs font-medium text-white">97% confidence</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </DashboardLayout>
   );
