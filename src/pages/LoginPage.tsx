@@ -30,12 +30,51 @@ const features = [
 
 export default function LoginPage() {
   const [activeRole, setActiveRole] = useState(roles[0]);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    navigate(activeRole.path);
+    setError(null);
+
+    if (!email || !password) {
+      setError("Email and password are required");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+        const userRole = data.user.role;
+        const roleObj = roles.find((r) => r.key === userRole);
+        navigate(roleObj?.path || "/");
+      } else {
+        setError(data.error || "Login failed");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -85,32 +124,62 @@ export default function LoginPage() {
           ))}
         </div>
         <form onSubmit={handleSubmit} className="form-column">
+          {error && (
+            <div
+              style={{
+                background: "rgba(255, 107, 107, 0.15)",
+                border: "1px solid rgba(255, 107, 107, 0.4)",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                fontSize: "13px",
+                color: "#ff7f7f"
+              }}
+            >
+              {error}
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label" htmlFor="email">
               Email Address
             </label>
-            <input id="email" type="email" required placeholder="admin@example.com" className="input-field" />
+            <input
+              id="email"
+              type="email"
+              required
+              placeholder="admin@example.com"
+              className="input-field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="password">
               Password
             </label>
-            <input id="password" type="password" required placeholder="••••••••" className="input-field" />
+            <input
+              id="password"
+              type="password"
+              required
+              placeholder="••••••••"
+              className="input-field"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
           <div className="utility-row">
             <label>
               <input type="checkbox" defaultChecked /> Remember me
             </label>
-            <a className="secondary-link" href="#">
+            <a className="secondary-link" href="/forgot-password">
               Forgot Password?
             </a>
           </div>
-          <button type="submit" className="primary-button">
-            Sign In
+          <button type="submit" className="primary-button" disabled={loading}>
+            {loading ? "Signing In..." : "Sign In"}
           </button>
           <div className="divider" />
           <div className="switch-link">
-            Don&apos;t have an account? <a href="#">Sign up</a>
+            Don&apos;t have an account? <a href="/signup">Sign up</a>
           </div>
         </form>
       </section>

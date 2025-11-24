@@ -981,30 +981,44 @@ def get_admin_reports():
 @app.route("/api/auditor/reports", methods=["GET"])
 def get_auditor_reports():
     try:
+        from collections import defaultdict
+        
         category_filter = request.args.get("category", None)
+        date_range = request.args.get("dateRange", "All Time")
+        
         expenses = Expense.query.all()
+        
+        date_cutoff = None
+        if date_range == "Last 3 Months":
+            date_cutoff = datetime.utcnow() - timedelta(days=90)
+        elif date_range == "Last 5 Months":
+            date_cutoff = datetime.utcnow() - timedelta(days=150)
+        elif date_range == "Last Year":
+            date_cutoff = datetime.utcnow() - timedelta(days=365)
+        
+        if date_cutoff:
+            expenses = [e for e in expenses if e.uploaded_at and e.uploaded_at >= date_cutoff]
         
         if category_filter and category_filter != "All Categories":
             expenses = [e for e in expenses if e.category == category_filter]
         
         anomalies = AnomalyDetection.query.all()
         
-        total_expenses = len(expenses)
+        if date_cutoff:
+            anomalies = [a for a in anomalies if a.detected_at and a.detected_at >= date_cutoff]
+        
+        total_transactions = len(expenses)
         total_amount = sum(e.amount for e in expenses) if expenses else 0
         
-        by_category = {}
+        by_category = defaultdict(float)
         for expense in expenses:
-            category = expense.category
-            if category not in by_category:
-                by_category[category] = 0
-            by_category[category] += expense.amount
+            by_category[expense.category] += expense.amount
         
         category_spending_data = [
-            {"category": cat, "amount": amt} 
-            for cat, amt in by_category.items()
+            {"category": cat, "amount": round(amt, 2)} 
+            for cat, amt in sorted(by_category.items(), key=lambda x: x[1], reverse=True)
         ]
         
-        from collections import defaultdict
         monthly_data = defaultdict(lambda: defaultdict(float))
         
         for expense in expenses:
@@ -1013,70 +1027,125 @@ def get_auditor_reports():
         
         expense_trend_data = []
         for month_year in sorted(monthly_data.keys()):
-            month_name = datetime.strptime(month_year, "%Y-%m").strftime("%b")
+            month_name = datetime.strptime(month_year, "%Y-%m").strftime("%b %y")
             amount = sum(monthly_data[month_year].values())
-            expense_trend_data.append({"month": month_name, "amount": amount})
+            expense_trend_data.append({"month": month_name, "amount": round(amount, 2)})
         
-        average_per_transaction = (total_amount / total_expenses) if total_expenses > 0 else 0
+        average_per_transaction = (total_amount / total_transactions) if total_transactions > 0 else 0
         
         anomalous_expense_ids = set(a.expense_id for a in anomalies)
         flagged_items = len(anomalous_expense_ids)
         
-        compliance_rate = ((total_expenses - flagged_items) / total_expenses * 100) if total_expenses > 0 else 100
+        compliance_rate = ((total_transactions - flagged_items) / total_transactions * 100) if total_transactions > 0 else 100
         compliance_rate = round(min(100, max(0, compliance_rate)), 1)
         
         flagged_amount = sum(e.amount for e in expenses if e.id in anomalous_expense_ids)
         
-        fraud_types = defaultdict(int)
+        anomaly_types = defaultdict(int)
+        severity_counts = defaultdict(int)
         for anomaly in anomalies:
-            status = anomaly.status if hasattr(anomaly, 'status') else "Unknown"
-            fraud_types[status] += 1
+            if anomaly.expense_id in [e.id for e in expenses]:
+                anomaly_types[anomaly.anomaly_type] += 1
+                severity_counts[anomaly.severity] += 1
         
         fraud_detection_data = [
-            {"category": dtype, "count": count, "fill": "#ff6b6b"} 
-            for dtype, count in fraud_types.items()
+            {"category": atype, "count": count, "fill": "#ff6b6b" if count > 0 else "#cccccc"} 
+            for atype, count in anomaly_types.items()
         ]
         
         if not fraud_detection_data:
             fraud_detection_data = [
-                {"category": "Duplicates", "count": 0, "fill": "#ff6b6b"},
-                {"category": "Unusual", "count": 0, "fill": "#ffa94d"},
-                {"category": "Unmatched", "count": 0, "fill": "#ff8c42"}
+                {"category": "Duplicates", "count": 0, "fill": "#cccccc"},
+                {"category": "Unusual Pattern", "count": 0, "fill": "#cccccc"},
+                {"category": "Missing Info", "count": 0, "fill": "#cccccc"}
             ]
         
-        ai_insights = [
-            {
-                "id": "insight-1",
-                "type": "Spending Pattern",
-                "severity": "Info",
-                "message": f"Total transactions analyzed: {len(expenses)} receipts with ${total_amount:.2f} spending."
-            }
-        ]
+        ai_insights = []
         
-        if flagged_items > 0:
+        ai_insights.append({
+            "id": "insight-1",
+            "type": "Spending Pattern",
+            "severity": "Info",
+            "message": f"Analyzed {total_transactions} receipt(s) totaling ${total_amount:.2f} with average transaction of ${average_per_transaction:.2f}."
+        })
+        
+        if total_transactions > 0 and category_spending_data:
+            top_category = category_spending_data[0]
+            category_percentage = (top_category["amount"] / total_amount * 100) if total_amount > 0 else 0
             ai_insights.append({
                 "id": "insight-2",
-                "type": "Anomaly Alert",
-                "severity": "Alert",
-                "message": f"Detected {flagged_items} flagged transaction(s) totaling ${flagged_amount:.2f}. Manual review recommended for compliance verification."
+                "type": "Spending Insight",
+                "severity": "Info",
+                "message": f"'{top_category['category']}' dominates spending at ${top_category['amount']:.2f} ({category_percentage:.1f}% of total). Consider vendor negotiation opportunities."
             })
         
-        if compliance_rate >= 95:
+        if flagged_items > 0:
+            flag_percentage = (flagged_items / total_transactions * 100) if total_transactions > 0 else 0
+            severity = "Alert" if flag_percentage > 10 else "Warning"
+            ai_insights.append({
+                "id": "insight-3",
+                "type": "Anomaly Alert",
+                "severity": severity,
+                "message": f"Detected {flagged_items} anomalies ({flag_percentage:.1f}% of transactions) totaling ${flagged_amount:.2f}. Priority review required."
+            })
+        else:
             ai_insights.append({
                 "id": "insight-3",
                 "type": "Compliance Status",
                 "severity": "Success",
-                "message": f"Compliance rate is {compliance_rate}%. {int(compliance_rate)}% of submitted expenses meet standards."
+                "message": f"All {total_transactions} transactions passed validation checks. No anomalies detected."
             })
         
-        if category_spending_data:
-            top_category = max(category_spending_data, key=lambda x: x["amount"])
+        if compliance_rate >= 95:
             ai_insights.append({
                 "id": "insight-4",
-                "type": "Recommendation",
-                "severity": "Warning",
-                "message": f"'{top_category['category']}' is the highest spending category at ${top_category['amount']:.2f}. Review for cost optimization opportunities."
+                "type": "Compliance Status",
+                "severity": "Success",
+                "message": f"Excellent compliance rate of {compliance_rate}%. Only {flagged_items} items require review."
             })
+        elif compliance_rate >= 80:
+            ai_insights.append({
+                "id": "insight-4",
+                "type": "Compliance Status",
+                "severity": "Warning",
+                "message": f"Compliance rate is {compliance_rate}%. Recommend reviewing {flagged_items} flagged transactions."
+            })
+        else:
+            ai_insights.append({
+                "id": "insight-4",
+                "type": "Compliance Alert",
+                "severity": "Alert",
+                "message": f"Compliance rate below threshold at {compliance_rate}%. Immediate action needed for {flagged_items} items."
+            })
+        
+        if expense_trend_data:
+            amounts = [d["amount"] for d in expense_trend_data]
+            if len(amounts) > 1:
+                trend_change = ((amounts[-1] - amounts[0]) / amounts[0] * 100) if amounts[0] > 0 else 0
+                if trend_change > 15:
+                    ai_insights.append({
+                        "id": "insight-5",
+                        "type": "Spending Trend",
+                        "severity": "Warning",
+                        "message": f"Spending increased by {trend_change:.1f}% from period start. Monitor for budget overruns."
+                    })
+                elif trend_change < -15:
+                    ai_insights.append({
+                        "id": "insight-5",
+                        "type": "Spending Trend",
+                        "severity": "Success",
+                        "message": f"Spending decreased by {abs(trend_change):.1f}% from period start. Cost control measures effective."
+                    })
+        
+        if category_spending_data and len(category_spending_data) > 1:
+            top_two = category_spending_data[:2]
+            if top_two[0]["amount"] > top_two[1]["amount"] * 2:
+                ai_insights.append({
+                    "id": "insight-6",
+                    "type": "Recommendation",
+                    "severity": "Warning",
+                    "message": f"High concentration in '{top_two[0]['category']}'. Diversify vendors to reduce dependency risk."
+                })
         
         return jsonify({
             "success": True,
@@ -1084,7 +1153,7 @@ def get_auditor_reports():
             "complianceRate": compliance_rate,
             "averagePerTransaction": round(average_per_transaction, 2),
             "flaggedItems": flagged_items,
-            "flaggedAmount": flagged_amount,
+            "flaggedAmount": round(flagged_amount, 2),
             "expenseTrendData": expense_trend_data,
             "categorySpendingData": category_spending_data,
             "fraudDetectionData": fraud_detection_data,

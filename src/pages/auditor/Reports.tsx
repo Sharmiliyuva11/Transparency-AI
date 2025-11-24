@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import jsPDF from "jspdf";
 
 interface MetricCardProps {
   label: string;
@@ -111,7 +112,12 @@ export default function AuditorReports() {
     const fetchReportsData = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:5000/api/auditor/reports");
+        const params = new URLSearchParams();
+        params.append("dateRange", dateRange);
+        if (category && category !== "All Categories") {
+          params.append("category", category);
+        }
+        const response = await fetch(`http://localhost:5000/api/auditor/reports?${params.toString()}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -141,7 +147,7 @@ export default function AuditorReports() {
     };
 
     fetchReportsData();
-  }, []);
+  }, [dateRange, category]);
 
   if (loading) {
     return (
@@ -161,43 +167,170 @@ export default function AuditorReports() {
 
   const handleDownloadPDF = () => {
     try {
-      const reportContent = `
-EXPENSE REPORTS AND INSIGHTS
-Generated: ${new Date().toLocaleDateString()}
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
 
-SUMMARY STATISTICS
-==================
-Total Expenses: $${data.totalExpenses.toFixed(2)}
-Compliance Rate: ${data.complianceRate}%
-Average per Transaction: $${data.averagePerTransaction.toFixed(2)}
-Flagged Items: ${data.flaggedItems}
-Flagged Amount: $${data.flaggedAmount.toFixed(2)}
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 10;
 
-EXPENSE TREND
-=============
-${data.expenseTrendData.map((d) => `${d.month}: $${d.amount.toFixed(2)}`).join("\n")}
+      doc.setFillColor(12, 23, 54);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
 
-CATEGORY SPENDING
-=================
-${data.categorySpendingData.map((d) => `${d.category}: $${d.amount.toFixed(2)}`).join("\n")}
+      doc.setFillColor(59, 168, 255);
+      doc.rect(0, 0, pageWidth, 40, "F");
 
-AI INSIGHTS
-===========
-${data.aiInsights.map((i) => `[${i.severity}] ${i.type}: ${i.message}`).join("\n\n")}
-      `;
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(28);
+      doc.setFont(undefined, "bold");
+      doc.text("EXPENSE AUDIT REPORT", pageWidth / 2, 20, { align: "center" });
 
-      const blob = new Blob([reportContent], { type: "text/plain" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `ExpenseReport_${new Date().toISOString().split("T")[0]}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      doc.setFontSize(11);
+      doc.setFont(undefined, "normal");
+      doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, 32, { align: "center" });
+
+      yPosition = 50;
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("SUMMARY STATISTICS", 15, yPosition);
+      yPosition += 12;
+
+      const metrics = [
+        { label: "Total Expenses", value: `$${data.totalExpenses.toFixed(2)}`, color: [58, 168, 255] },
+        { label: "Compliance Rate", value: `${data.complianceRate}%`, color: [56, 215, 136] },
+        { label: "Avg Per Transaction", value: `$${data.averagePerTransaction.toFixed(2)}`, color: [255, 169, 77] },
+        { label: "Flagged Items", value: `${data.flaggedItems}`, color: [255, 107, 107] }
+      ];
+
+      metrics.forEach((metric, index) => {
+        const xPos = 15 + (index % 2) * 90;
+        const yPos = yPosition + Math.floor(index / 2) * 20;
+
+        doc.setFillColor(metric.color[0], metric.color[1], metric.color[2]);
+        doc.rect(xPos, yPos, 80, 15, "F");
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.text(metric.label, xPos + 5, yPos + 6);
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text(metric.value, xPos + 5, yPos + 12);
+      });
+
+      yPosition += 50;
+
+      doc.setFillColor(59, 168, 255);
+      doc.rect(15, yPosition - 8, pageWidth - 30, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text("EXPENSE TREND", 15, yPosition - 2);
+
+      yPosition += 8;
+      doc.setTextColor(200, 200, 220);
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+
+      data.expenseTrendData.forEach((item) => {
+        doc.text(`${item.month}: $${item.amount.toFixed(2)}`, 20, yPosition);
+        yPosition += 6;
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          doc.setFillColor(12, 23, 54);
+          doc.rect(0, 0, pageWidth, pageHeight, "F");
+          yPosition = 20;
+        }
+      });
+
+      yPosition += 6;
+
+      doc.setFillColor(56, 215, 136);
+      doc.rect(15, yPosition - 8, pageWidth - 30, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text("CATEGORY-WISE SPENDING", 15, yPosition - 2);
+
+      yPosition += 8;
+      doc.setTextColor(200, 200, 220);
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+
+      data.categorySpendingData.forEach((item) => {
+        const percentage = ((item.amount / data.totalExpenses) * 100).toFixed(1);
+        doc.text(`${item.category}: $${item.amount.toFixed(2)} (${percentage}%)`, 20, yPosition);
+        yPosition += 6;
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          doc.setFillColor(12, 23, 54);
+          doc.rect(0, 0, pageWidth, pageHeight, "F");
+          yPosition = 20;
+        }
+      });
+
+      yPosition += 8;
+
+      doc.setFillColor(255, 169, 77);
+      doc.rect(15, yPosition - 8, pageWidth - 30, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text("AI INSIGHTS & RECOMMENDATIONS", 15, yPosition - 2);
+
+      yPosition += 10;
+
+      data.aiInsights.forEach((insight) => {
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          doc.setFillColor(12, 23, 54);
+          doc.rect(0, 0, pageWidth, pageHeight, "F");
+          yPosition = 20;
+        }
+
+        const severityColors: Record<string, number[]> = {
+          Info: [58, 168, 255],
+          Alert: [255, 107, 107],
+          Success: [56, 215, 136],
+          Warning: [255, 169, 77]
+        };
+
+        const color = severityColors[insight.severity] || [100, 100, 100];
+        doc.setFillColor(color[0], color[1], color[2]);
+        doc.circle(18, yPosition + 2, 2, "F");
+
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.setFontSize(10);
+        doc.setFont(undefined, "bold");
+        doc.text(`[${insight.severity}] ${insight.type}`, 23, yPosition);
+
+        doc.setTextColor(200, 200, 220);
+        doc.setFontSize(9);
+        doc.setFont(undefined, "normal");
+        const splitMessage = doc.splitTextToSize(insight.message, pageWidth - 40);
+        doc.text(splitMessage, 23, yPosition + 6);
+
+        yPosition += 6 + splitMessage.length * 5 + 4;
+      });
+
+      yPosition = pageHeight - 15;
+      doc.setTextColor(100, 120, 165);
+      doc.setFontSize(8);
+      doc.setFont(undefined, "normal");
+      doc.text("Transparency-AI Expense Audit System", pageWidth / 2, yPosition, { align: "center" });
+      doc.text(`Report ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()}`, pageWidth / 2, yPosition + 5, { align: "center" });
+
+      const filename = `ExpenseAuditReport_${new Date().toISOString().split("T")[0]}.pdf`;
+      doc.save(filename);
     } catch (err) {
-      console.error("Error downloading report:", err);
-      alert("Failed to download report");
+      console.error("Error generating PDF:", err);
+      alert("Failed to generate PDF report");
     }
   };
 

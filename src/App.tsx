@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import Overview from "./pages/employee/Overview";
 import Upload from "./pages/employee/Upload";
 import Expenses from "./pages/employee/Expenses";
@@ -30,6 +32,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/dashboard/admin" element={<AdminDashboardWrapper />}>
         <Route index element={<AdminOverview />} />
         <Route path="upload" element={<AdminUpload />} />
