@@ -159,11 +159,83 @@ export default function AuditorReports() {
     );
   }
 
+  const handleDownloadPDF = () => {
+    try {
+      const reportContent = `
+EXPENSE REPORTS AND INSIGHTS
+Generated: ${new Date().toLocaleDateString()}
+
+SUMMARY STATISTICS
+==================
+Total Expenses: $${data.totalExpenses.toFixed(2)}
+Compliance Rate: ${data.complianceRate}%
+Average per Transaction: $${data.averagePerTransaction.toFixed(2)}
+Flagged Items: ${data.flaggedItems}
+Flagged Amount: $${data.flaggedAmount.toFixed(2)}
+
+EXPENSE TREND
+=============
+${data.expenseTrendData.map((d) => `${d.month}: $${d.amount.toFixed(2)}`).join("\n")}
+
+CATEGORY SPENDING
+=================
+${data.categorySpendingData.map((d) => `${d.category}: $${d.amount.toFixed(2)}`).join("\n")}
+
+AI INSIGHTS
+===========
+${data.aiInsights.map((i) => `[${i.severity}] ${i.type}: ${i.message}`).join("\n\n")}
+      `;
+
+      const blob = new Blob([reportContent], { type: "text/plain" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ExpenseReport_${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading report:", err);
+      alert("Failed to download report");
+    }
+  };
+
   return (
     <>
-      <div style={{ marginBottom: "12px" }}>
-        <h2 className="dashboard-title">Expense Reports and Insights</h2>
-        <p className="dashboard-subtitle">Comprehensive analysis of spending patterns and anomalies</p>
+      <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h2 className="dashboard-title">Expense Reports and Insights</h2>
+          <p className="dashboard-subtitle">Comprehensive analysis of spending patterns and anomalies</p>
+        </div>
+        <button
+          onClick={handleDownloadPDF}
+          style={{
+            background: "linear-gradient(135deg, #3ba8ff, #24e0ff)",
+            color: "#041024",
+            padding: "12px 20px",
+            borderRadius: "12px",
+            border: "none",
+            fontWeight: 600,
+            fontSize: "14px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "transform 0.2s ease, box-shadow 0.2s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 18px 35px rgba(32, 152, 255, 0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>⬇️</span>
+          Download Report (PDF)
+        </button>
       </div>
 
       {/* Filters Section */}
